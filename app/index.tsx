@@ -1,0 +1,714 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, Share, Platform, RefreshControl } from 'react-native';
+import AppBar from '../components/AppBar';
+import BottomMenu from '../components/BottomMenu';
+import { fontConfig } from '../styles/global';
+import { List, Heart, MapTrifold, FilmStrip, Book, Television, GameController, UserCircle, Globe } from 'phosphor-react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
+import { useRouter } from 'expo-router';
+
+// Import other screens
+import SearchScreen from './search';
+import CreateScreen from './create';
+import DiscoverScreen from './discover';
+import ProfileScreen from './profile';
+
+export default function MainApp() {
+  const [activeTab, setActiveTab] = useState('home');
+
+  const handleTabPress = (tab: string) => {
+    setActiveTab(tab);
+  };
+
+  const renderCurrentScreen = () => {
+    switch (activeTab) {
+      case 'search':
+        return <SearchScreen onTabPress={handleTabPress} />;
+      case 'add':
+        return <CreateScreen onTabPress={handleTabPress} />;
+      case 'discover':
+        return <DiscoverScreen onTabPress={handleTabPress} />;
+      case 'profile':
+        return <ProfileScreen onTabPress={handleTabPress} />;
+      default:
+        return <HomeContent />;
+    }
+  };
+
+  if (activeTab !== 'home') {
+    return renderCurrentScreen();
+  }
+
+  return (
+    <View style={styles.container}>
+      <AppBar title="ConnectList" />
+      <HomeContent />
+      <BottomMenu activeTab={activeTab} onTabPress={handleTabPress} />
+    </View>
+  );
+}
+
+function HomeContent() {
+  const router = useRouter();
+  const [lists, setLists] = useState<any[]>([]);
+  const [listItems, setListItems] = useState<Record<string, any[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [likedLists, setLikedLists] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    fetchCurrentUser();
+    fetchAllLists();
+  }, []);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) {
+        console.error('Auth error:', authError);
+        return;
+      }
+      
+      setCurrentUser(user);
+      if (user) {
+        // Fetch user's liked lists
+        const { data: likes, error: likesError } = await supabase
+          .from('list_likes')
+          .select('list_id')
+          .eq('user_id', user.id);
+        
+        if (likesError) {
+          console.error('Error fetching liked lists:', likesError);
+          return;
+        }
+        
+        if (likes) {
+          setLikedLists(new Set(likes.map(like => like.list_id)));
+        }
+      }
+    } catch (error) {
+      console.error('Error in fetchCurrentUser:', error);
+    }
+  };
+
+  const fetchAllLists = async () => {
+    try {
+      // First try to fetch basic lists data
+      const { data: listsData, error } = await supabase
+        .from('lists')
+        .select('*')
+        .eq('privacy', 'public')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) {
+        console.error('Error fetching lists:', error);
+        Alert.alert('Error', 'Failed to load lists. Please try again.');
+        return;
+      }
+
+      if (listsData && listsData.length > 0) {
+        // Fetch users_profiles data separately
+        const userIds = [...new Set(listsData.map(list => list.creator_id))];
+        const { data: usersData } = await supabase
+          .from('users_profiles')
+          .select('id, username, full_name, avatar_url')
+          .in('id', userIds);
+
+        // Fetch categories data separately  
+        const categoryNames = [...new Set(listsData.map(list => list.category).filter(Boolean))];
+        const { data: categoriesData } = await supabase
+          .from('categories')
+          .select('name, display_name')
+          .in('name', categoryNames);
+
+        // Create lookup maps
+        const usersMap = usersData?.reduce((acc, user) => ({ ...acc, [user.id]: user }), {}) || {};
+        const categoriesMap = categoriesData?.reduce((acc, cat) => ({ ...acc, [cat.name]: cat }), {}) || {};
+
+        // Combine data
+        const enrichedLists = listsData.map(list => ({
+          ...list,
+          users_profiles: usersMap[list.creator_id] || null,
+          categories: categoriesMap[list.category] || null
+        }));
+
+        setLists(enrichedLists);
+
+        // Fetch items for each list
+        const itemsPromises = listsData.map(async (list) => {
+          try {
+            const { data: items, error: itemsError } = await supabase
+              .from('list_items')
+              .select('*')
+              .eq('list_id', list.id)
+              .order('position', { ascending: true })
+              .limit(10);
+            
+            if (itemsError) {
+              console.error(`Error fetching items for list ${list.id}:`, itemsError);
+              return { listId: list.id, items: [] };
+            }
+            
+            return { listId: list.id, items: items || [] };
+          } catch (error) {
+            console.error(`Error in items promise for list ${list.id}:`, error);
+            return { listId: list.id, items: [] };
+          }
+        });
+
+        const itemsResults = await Promise.all(itemsPromises);
+        const itemsMap: Record<string, any[]> = {};
+        itemsResults.forEach(result => {
+          itemsMap[result.listId] = result.items;
+        });
+        setListItems(itemsMap);
+      } else {
+        // No lists found
+        setLists([]);
+        setListItems({});
+      }
+    } catch (error) {
+      console.error('Error fetching lists:', error);
+      Alert.alert('Error', 'Failed to load lists. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchAllLists(), fetchCurrentUser()]);
+    } catch (error) {
+      console.error('Error during refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  const handleLike = async (listId: string, currentLikes: number) => {
+    if (!currentUser) {
+      Alert.alert('Login Required', 'Please login to like lists');
+      return;
+    }
+
+    const isLiked = likedLists.has(listId);
+
+    try {
+      if (isLiked) {
+        // Unlike
+        await supabase
+          .from('list_likes')
+          .delete()
+          .eq('list_id', listId)
+          .eq('user_id', currentUser.id);
+
+        // Update local state
+        const newLikedLists = new Set(likedLists);
+        newLikedLists.delete(listId);
+        setLikedLists(newLikedLists);
+
+        // Update list likes count
+        await supabase
+          .from('lists')
+          .update({ likes_count: Math.max(0, currentLikes - 1) })
+          .eq('id', listId);
+
+        // Update local list
+        setLists(lists.map(list => 
+          list.id === listId 
+            ? { ...list, likes_count: Math.max(0, currentLikes - 1) }
+            : list
+        ));
+      } else {
+        // Like
+        await supabase
+          .from('list_likes')
+          .insert({
+            list_id: listId,
+            user_id: currentUser.id
+          });
+
+        // Update local state
+        const newLikedLists = new Set(likedLists);
+        newLikedLists.add(listId);
+        setLikedLists(newLikedLists);
+
+        // Update list likes count
+        await supabase
+          .from('lists')
+          .update({ likes_count: currentLikes + 1 })
+          .eq('id', listId);
+
+        // Update local list
+        setLists(lists.map(list => 
+          list.id === listId 
+            ? { ...list, likes_count: currentLikes + 1 }
+            : list
+        ));
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      Alert.alert('Error', 'Failed to update like');
+    }
+  };
+
+  const handleComment = (listId: string) => {
+    // Navigate to list detail page with comments section
+    router.push(`/list/${listId}#comments`);
+  };
+
+  const handleShare = async (list: any) => {
+    try {
+      const shareUrl = `https://connectlist.app/list/${list.id}`;
+      const creator = list.users_profiles;
+      
+      let shareMessage = `Check out this list on ConnectList!\n\n`;
+      shareMessage += `📝 ${list.title}\n`;
+      shareMessage += `👤 by ${creator?.full_name || creator?.username || 'Unknown'}\n`;
+      
+      if (list.description) {
+        shareMessage += `\n${list.description}\n`;
+      }
+      
+      shareMessage += `\n📊 ${list.item_count || 0} items`;
+      shareMessage += ` • ❤️ ${list.likes_count || 0} likes`;
+      shareMessage += ` • 💬 ${list.comments_count || 0} comments\n`;
+      shareMessage += `\n🔗 ${shareUrl}`;
+
+      if (Platform.OS === 'web') {
+        if (navigator.share) {
+          await navigator.share({
+            title: list.title,
+            text: shareMessage,
+            url: shareUrl
+          });
+        } else {
+          await navigator.clipboard.writeText(shareMessage);
+          Alert.alert('Success', 'List link copied to clipboard!');
+        }
+      } else {
+        await Share.share({
+          message: shareMessage,
+          title: list.title,
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing list:', error);
+    }
+  };
+
+  // Helper functions
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'movies':
+        return <FilmStrip size={12} color="#666" />;
+      case 'tv_shows':
+        return <Television size={12} color="#666" />;
+      case 'books':
+        return <Book size={12} color="#666" />;
+      case 'games':
+        return <GameController size={12} color="#666" />;
+      case 'places':
+        return <MapTrifold size={12} color="#666" />;
+      case 'persons':
+        return <UserCircle size={12} color="#666" />;
+      default:
+        return <List size={12} color="#666" />;
+    }
+  };
+
+  const getItemEmoji = (contentType: string) => {
+    switch (contentType) {
+      case 'movie':
+        return '🎬';
+      case 'tv':
+        return '📺';
+      case 'book':
+        return '📚';
+      case 'game':
+        return '🎮';
+      case 'place':
+        return '📍';
+      case 'person':
+        return '👤';
+      default:
+        return '📝';
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading lists...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView 
+      style={styles.content} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {lists.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>No lists found</Text>
+          <Text style={styles.emptyStateSubtext}>Be the first to create a list!</Text>
+        </View>
+      ) : (
+        lists.map((list) => {
+          const creator = list.users_profiles;
+          const isLiked = likedLists.has(list.id);
+          
+          return (
+            <View key={list.id} style={styles.listPreviewContainer}>
+              <TouchableOpacity 
+                style={styles.listHeader}
+                onPress={() => router.push(`/list/${list.id}`)}
+              >
+                <View style={styles.listHeaderLeft}>
+                  {creator?.avatar_url ? (
+                    <Image source={{ uri: creator.avatar_url }} style={styles.listAuthorAvatar} />
+                  ) : (
+                    <View style={styles.listAuthorAvatar}>
+                      <Text style={styles.listAuthorInitial}>
+                        {creator?.full_name?.charAt(0) || creator?.username?.charAt(0) || '?'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.listInfo}>
+                    <View style={styles.listTitleRow}>
+                      <Text style={styles.listAuthorName}>
+                        {creator?.full_name || creator?.username || 'Unknown User'}
+                      </Text>
+                      <Text style={styles.listAction}>created</Text>
+                      <Text style={styles.listTitle}>{list.title}</Text>
+                    </View>
+                    <View style={styles.listMeta}>
+                      <Text style={styles.listUsername}>
+                        @{creator?.username || 'unknown'}
+                      </Text>
+                      <Text style={styles.separator}>•</Text>
+                      <View style={styles.categoryTag}>
+                        {getCategoryIcon(list.categories?.name || list.category)}
+                        <Text style={styles.listCategory}>
+                          {list.categories?.display_name || list.category || 'General'}
+                        </Text>
+                      </View>
+                      <Text style={styles.separator}>•</Text>
+                      <Text style={styles.listItemCount}>{list.item_count || 0} items</Text>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+              
+              {list.description && (
+                <Text style={styles.listDescriptionText}>{list.description}</Text>
+              )}
+              
+              <View style={styles.divider} />
+              
+              {/* List Items Preview */}
+              {listItems[list.id] && listItems[list.id].length > 0 ? (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.itemsScrollView}
+                >
+                  <View style={styles.listItemsContainer}>
+                    {listItems[list.id].map((item) => (
+                      <TouchableOpacity 
+                        key={item.id} 
+                        style={styles.listItemCard}
+                        onPress={() => {
+                          if (item.content_id && item.content_type) {
+                            router.push(`/details/${item.content_type}/${item.content_id}`);
+                          }
+                        }}
+                      >
+                        {item.image_url ? (
+                          <Image source={{ uri: item.image_url }} style={styles.itemImage} />
+                        ) : (
+                          <View style={styles.itemImagePlaceholder}>
+                            <Text style={styles.itemEmoji}>{getItemEmoji(item.content_type)}</Text>
+                          </View>
+                        )}
+                        <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+                        <Text style={styles.itemSubtitle} numberOfLines={1}>
+                          {item.subtitle || item.content_type || 'Item'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              ) : (
+                <View style={styles.noItemsContainer}>
+                  <Text style={styles.noItemsText}>No items in this list yet</Text>
+                </View>
+              )}
+              
+              {/* List Stats */}
+              <View style={styles.listStatsRow}>
+                <TouchableOpacity 
+                  style={styles.statButton}
+                  onPress={() => handleLike(list.id, list.likes_count || 0)}
+                >
+                  <Heart 
+                    size={16} 
+                    color={isLiked ? "#EF4444" : "#6B7280"} 
+                    weight={isLiked ? "fill" : "regular"}
+                  />
+                  <Text style={[styles.statText, isLiked && styles.statTextActive]}>
+                    {list.likes_count || 0}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.statButton}
+                  onPress={() => handleComment(list.id)}
+                >
+                  <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
+                  <Text style={styles.statText}>{list.comments_count || 0}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.statButton}
+                  onPress={() => handleShare(list)}
+                >
+                  <Ionicons name="share-outline" size={16} color="#6B7280" />
+                  <Text style={styles.statText}>{list.shares_count || 0}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })
+      )}
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    ...fontConfig.regular,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 100,
+  },
+  emptyStateText: {
+    ...fontConfig.semibold,
+    fontSize: 18,
+    color: '#6B7280',
+    marginBottom: 8,
+  },
+  emptyStateSubtext: {
+    ...fontConfig.regular,
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  // List Preview Styles
+  listPreviewContainer: {
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  listHeader: {
+    marginBottom: 12,
+  },
+  listHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  listAuthorAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  listAuthorInitial: {
+    ...fontConfig.medium,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  listInfo: {
+    flex: 1,
+  },
+  listTitleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 4,
+  },
+  listAuthorName: {
+    ...fontConfig.medium,
+    fontSize: 14,
+    color: '#000000',
+  },
+  listAction: {
+    ...fontConfig.regular,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  listTitle: {
+    ...fontConfig.medium,
+    fontSize: 14,
+    color: '#F97316',
+  },
+  listMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+  },
+  listUsername: {
+    ...fontConfig.regular,
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  separator: {
+    ...fontConfig.regular,
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  categoryTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  listCategory: {
+    ...fontConfig.regular,
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  listItemCount: {
+    ...fontConfig.regular,
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  listDescriptionText: {
+    ...fontConfig.regular,
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  itemsScrollView: {
+    marginHorizontal: -16,
+    paddingHorizontal: 16,
+  },
+  listItemsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingRight: 16,
+  },
+  listItemCard: {
+    width: 100,
+    alignItems: 'center',
+  },
+  itemImage: {
+    width: 100,
+    height: 140,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  itemImagePlaceholder: {
+    width: 100,
+    height: 140,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  itemEmoji: {
+    fontSize: 32,
+  },
+  itemTitle: {
+    ...fontConfig.medium,
+    fontSize: 12,
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  itemSubtitle: {
+    ...fontConfig.regular,
+    fontSize: 10,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  noItemsContainer: {
+    paddingVertical: 20,
+    alignItems: 'center',
+  },
+  noItemsText: {
+    ...fontConfig.regular,
+    fontSize: 14,
+    color: '#9CA3AF',
+  },
+  listStatsRow: {
+    flexDirection: 'row',
+    gap: 24,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  statButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  statText: {
+    ...fontConfig.regular,
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  statTextActive: {
+    color: '#EF4444',
+  },
+});
