@@ -1,18 +1,22 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Image } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Bell, ChatCircle, ArrowLeft } from 'phosphor-react-native';
-import { fontConfig } from '../styles/global';
+// Font config removed - using direct font properties
 
 interface AppBarProps {
   title?: string;
   showBackButton?: boolean;
   rightComponent?: React.ReactNode;
+  rightAction?: {
+    icon: React.ReactNode;
+    onPress: () => void;
+  };
 }
 
-export default function AppBar({ title = 'ConnectList', showBackButton = false, rightComponent }: AppBarProps) {
+export default function AppBar({ title = 'ConnectList', showBackButton = false, rightComponent, rightAction }: AppBarProps) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   
@@ -26,17 +30,35 @@ export default function AppBar({ title = 'ConnectList', showBackButton = false, 
               <ArrowLeft size={24} color="#1F2937" weight="regular" />
             </TouchableOpacity>
           )}
-          <Text style={styles.title}>{title}</Text>
+          {title === 'ConnectList' ? (
+            <Image 
+              source={require('../assets/images/connectlist-beta-logo.png')} 
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={styles.title}>{title}</Text>
+          )}
         </View>
         <View style={styles.rightSection}>
           {rightComponent ? (
             rightComponent
+          ) : rightAction ? (
+            <TouchableOpacity style={styles.iconButton} onPress={rightAction.onPress}>
+              {rightAction.icon}
+            </TouchableOpacity>
           ) : !showBackButton ? (
             <>
-              <TouchableOpacity style={styles.iconButton}>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() => router.push('/notifications')}
+              >
                 <Bell size={24} color="#1F2937" weight="regular" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton}>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() => router.push('/messages')}
+              >
                 <ChatCircle size={24} color="#1F2937" weight="regular" />
               </TouchableOpacity>
             </>
@@ -87,8 +109,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
+    fontWeight: '600',
     color: '#1F2937',
     letterSpacing: -0.2,
+  },
+  logo: {
+    height: 28,
+    width: 120,
   },
 });

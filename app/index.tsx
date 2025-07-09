@@ -8,43 +8,31 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../lib/supabase';
 import { useRouter } from 'expo-router';
 
-// Import other screens
-import SearchScreen from './search';
-import CreateScreen from './create';
-import DiscoverScreen from './discover';
-import ProfileScreen from './profile';
 
 export default function MainApp() {
-  const [activeTab, setActiveTab] = useState('home');
+  const router = useRouter();
 
   const handleTabPress = (tab: string) => {
-    setActiveTab(tab);
-  };
-
-  const renderCurrentScreen = () => {
-    switch (activeTab) {
-      case 'search':
-        return <SearchScreen onTabPress={handleTabPress} />;
-      case 'add':
-        return <CreateScreen onTabPress={handleTabPress} />;
-      case 'discover':
-        return <DiscoverScreen onTabPress={handleTabPress} />;
-      case 'profile':
-        return <ProfileScreen onTabPress={handleTabPress} />;
-      default:
-        return <HomeContent />;
+    console.log('Tab pressed:', tab); // Debug log
+    if (tab === 'home') {
+      // Already on home page, do nothing
+    } else if (tab === 'search') {
+      router.push('/search');
+    } else if (tab === 'discover') {
+      router.push('/discover');
+    } else if (tab === 'profile') {
+      router.push('/profile');
+    } else if (tab === 'add') {
+      router.push('/create');
     }
   };
 
-  if (activeTab !== 'home') {
-    return renderCurrentScreen();
-  }
 
   return (
     <View style={styles.container}>
       <AppBar title="ConnectList" />
       <HomeContent />
-      <BottomMenu activeTab={activeTab} onTabPress={handleTabPress} />
+      <BottomMenu activeTab="home" onTabPress={handleTabPress} />
     </View>
   );
 }
@@ -302,22 +290,41 @@ function HomeContent() {
   };
 
   // Helper functions
+  const getCategoryDisplayName = (category: string) => {
+    switch (category) {
+      case 'movies':
+        return 'Movies';
+      case 'tv_shows':
+        return 'TV Shows';
+      case 'books':
+        return 'Books';
+      case 'games':
+        return 'Games';
+      case 'places':
+        return 'Places';
+      case 'persons':
+        return 'People';
+      default:
+        return 'General';
+    }
+  };
+
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'movies':
-        return <FilmStrip size={12} color="#666" />;
+        return <FilmStrip size={16} color="#666" />;
       case 'tv_shows':
-        return <Television size={12} color="#666" />;
+        return <Television size={16} color="#666" />;
       case 'books':
-        return <Book size={12} color="#666" />;
+        return <Book size={16} color="#666" />;
       case 'games':
-        return <GameController size={12} color="#666" />;
+        return <GameController size={16} color="#666" />;
       case 'places':
-        return <MapTrifold size={12} color="#666" />;
+        return <MapTrifold size={16} color="#666" />;
       case 'persons':
-        return <UserCircle size={12} color="#666" />;
+        return <UserCircle size={16} color="#666" />;
       default:
-        return <List size={12} color="#666" />;
+        return <List size={16} color="#666" />;
     }
   };
 
@@ -398,7 +405,7 @@ function HomeContent() {
                       <View style={styles.categoryTag}>
                         {getCategoryIcon(list.categories?.name || list.category)}
                         <Text style={styles.listCategory}>
-                          {list.categories?.display_name || list.category || 'General'}
+                          {list.categories?.display_name || getCategoryDisplayName(list.category)}
                         </Text>
                       </View>
                       <Text style={styles.separator}>•</Text>
@@ -460,7 +467,7 @@ function HomeContent() {
                   onPress={() => handleLike(list.id, list.likes_count || 0)}
                 >
                   <Heart 
-                    size={16} 
+                    size={21} 
                     color={isLiked ? "#EF4444" : "#6B7280"} 
                     weight={isLiked ? "fill" : "regular"}
                   />
@@ -472,14 +479,14 @@ function HomeContent() {
                   style={styles.statButton}
                   onPress={() => handleComment(list.id)}
                 >
-                  <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
+                  <Ionicons name="chatbubble-outline" size={21} color="#6B7280" />
                   <Text style={styles.statText}>{list.comments_count || 0}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.statButton}
                   onPress={() => handleShare(list)}
                 >
-                  <Ionicons name="share-outline" size={16} color="#6B7280" />
+                  <Ionicons name="share-outline" size={21} color="#6B7280" />
                   <Text style={styles.statText}>{list.shares_count || 0}</Text>
                 </TouchableOpacity>
               </View>
@@ -507,7 +514,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
+    fontWeight: '400',
     fontSize: 16,
     color: '#6B7280',
   },
@@ -518,52 +526,47 @@ const styles = StyleSheet.create({
     paddingVertical: 100,
   },
   emptyStateText: {
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
+    fontWeight: '600',
     fontSize: 18,
     color: '#6B7280',
     marginBottom: 8,
   },
   emptyStateSubtext: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
+    fontWeight: '400',
     fontSize: 14,
     color: '#9CA3AF',
   },
   // List Preview Styles
   listPreviewContainer: {
-    marginBottom: 24,
+    marginBottom: 28,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 2,
+    padding: 19,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    borderColor: '#F3F4F6',
   },
   listHeader: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   listHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   listAuthorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 47,
+    height: 47,
+    borderRadius: 24,
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   listAuthorInitial: {
-    ...fontConfig.medium,
-    fontSize: 16,
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    fontSize: 19,
     color: '#6B7280',
   },
   listInfo: {
@@ -573,139 +576,151 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
+    gap: 5,
+    marginBottom: 5,
   },
   listAuthorName: {
-    ...fontConfig.medium,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    fontSize: 16,
     color: '#000000',
   },
   listAction: {
-    ...fontConfig.regular,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 16,
     color: '#6B7280',
   },
   listTitle: {
-    ...fontConfig.medium,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    fontSize: 16,
     color: '#F97316',
   },
   listMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   listUsername: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 14,
     color: '#6B7280',
   },
   separator: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 14,
     color: '#6B7280',
   },
   categoryTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   listCategory: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 14,
     color: '#6B7280',
   },
   listItemCount: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 14,
     color: '#6B7280',
   },
   listDescriptionText: {
-    ...fontConfig.regular,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 16,
     color: '#6B7280',
-    marginBottom: 12,
-    lineHeight: 20,
+    marginBottom: 14,
+    lineHeight: 23,
   },
   divider: {
     height: 1,
     backgroundColor: '#E5E7EB',
-    marginVertical: 12,
+    marginVertical: 14,
   },
   itemsScrollView: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
+    marginHorizontal: -19,
+    paddingHorizontal: 19,
   },
   listItemsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    paddingRight: 16,
+    gap: 14,
+    paddingRight: 19,
   },
   listItemCard: {
-    width: 100,
+    width: 117,
     alignItems: 'center',
   },
   itemImage: {
-    width: 100,
-    height: 140,
+    width: 117,
+    height: 164,
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    marginBottom: 8,
+    borderRadius: 9,
+    marginBottom: 9,
   },
   itemImagePlaceholder: {
-    width: 100,
-    height: 140,
+    width: 117,
+    height: 164,
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 9,
   },
   itemEmoji: {
-    fontSize: 32,
+    fontSize: 38,
   },
   itemTitle: {
-    ...fontConfig.medium,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontWeight: '500',
+    fontSize: 14,
     color: '#1F2937',
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   itemSubtitle: {
-    ...fontConfig.regular,
-    fontSize: 10,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
   },
   noItemsContainer: {
-    paddingVertical: 20,
+    paddingVertical: 23,
     alignItems: 'center',
   },
   noItemsText: {
-    ...fontConfig.regular,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 16,
     color: '#9CA3AF',
   },
   listStatsRow: {
     flexDirection: 'row',
-    gap: 24,
-    marginTop: 12,
-    paddingTop: 12,
+    gap: 7,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
   statButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 7,
     paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
   },
   statText: {
-    ...fontConfig.regular,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    fontSize: 16,
     color: '#6B7280',
   },
   statTextActive: {

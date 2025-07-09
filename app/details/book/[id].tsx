@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginTop: 16,
   },
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   headerContainer: {
@@ -534,21 +534,21 @@ const styles = StyleSheet.create({
   },
   bookTitle: {
     fontSize: 24,
-    ...fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     textAlign: 'center',
     marginBottom: 8,
   },
   bookSubtitle: {
     fontSize: 18,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     textAlign: 'center',
     marginBottom: 8,
   },
   bookAuthors: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#3B82F6',
     textAlign: 'center',
     marginBottom: 12,
@@ -560,13 +560,13 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginLeft: 4,
   },
   ratingsCount: {
     fontSize: 14,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginLeft: 4,
   },
@@ -581,12 +581,12 @@ const styles = StyleSheet.create({
   },
   metaLabel: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   metaText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
   },
   actionButtons: {
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
   secondaryButton: {
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#3B82F6',
   },
   section: {
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 12,
   },
@@ -650,12 +650,12 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
   },
   description: {
     fontSize: 16,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#374151',
     lineHeight: 24,
   },
@@ -669,13 +669,13 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     flex: 1,
   },
   detailValue: {
     fontSize: 14,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     flex: 2,
     textAlign: 'right',
@@ -692,7 +692,7 @@ const styles = StyleSheet.create({
   },
   linkButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
   buyButton: {
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
   },
   buyButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
 });

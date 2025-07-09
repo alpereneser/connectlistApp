@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginTop: 16,
   },
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   imageContainer: {
@@ -446,19 +446,19 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: 28,
-    ...fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     flex: 1,
     marginRight: 16,
   },
   priceRange: {
     fontSize: 20,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#F97316',
   },
   placeCategory: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#F97316',
     marginBottom: 12,
   },
@@ -468,13 +468,13 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 16,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginLeft: 6,
   },
   ratingLabel: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginLeft: 4,
   },
@@ -483,13 +483,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#4B5563',
     lineHeight: 24,
   },
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   },
   amenityText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
   },
   contactItem: {
@@ -516,14 +516,14 @@ const styles = StyleSheet.create({
   },
   contactText: {
     fontSize: 16,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#4B5563',
     marginLeft: 12,
     flex: 1,
   },
   contactLink: {
     color: '#F97316',
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
   },
   listActionButtons: {
     flexDirection: 'row',
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
   secondaryButton: {
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#F97316',
   },
 });

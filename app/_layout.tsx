@@ -9,12 +9,20 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { supabase } from '../lib/supabase';
+import { initSentry, setUserContext, clearUserContext } from '../lib/sentry';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function RootLayout() {
+  // Initialize Sentry
+  useEffect(() => {
+    initSentry();
+  }, []);
+
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    // For React Native, we'll rely on system fonts and web fonts
+    // The fontConfig will handle the platform-specific font selection
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -40,6 +48,16 @@ export default function RootLayout() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setIsAuthenticated(!!session?.user);
+        
+        // Set user context for Sentry
+        if (session?.user) {
+          setUserContext({
+            id: session.user.id,
+            email: session.user.email,
+          });
+        } else {
+          clearUserContext();
+        }
       }
     );
 
@@ -66,12 +84,14 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="search" />
           <Stack.Screen name="create" />
+          <Stack.Screen name="create-list" />
           <Stack.Screen name="discover" />
           <Stack.Screen name="profile" />
           <Stack.Screen name="details/[id]" />
@@ -87,7 +107,8 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding/index" />
           <Stack.Screen name="+not-found" />
         </Stack>
-      </ThemeProvider>
-    </SafeAreaProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

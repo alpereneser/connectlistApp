@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginTop: 16,
   },
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   header: {
@@ -435,13 +435,13 @@ const styles = StyleSheet.create({
   },
   personName: {
     fontSize: 24,
-    ...fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 4,
   },
   department: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginBottom: 12,
   },
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     flex: 1,
   },
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
   secondaryButton: {
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#3B82F6',
   },
   section: {
@@ -503,13 +503,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 12,
   },
   biography: {
     fontSize: 16,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#374151',
     lineHeight: 24,
   },
@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
   },
   aliasText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
   },
   knownForContainer: {
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
   },
   knownForTitle: {
     fontSize: 12,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#1F2937',
     textAlign: 'center',
     marginBottom: 4,
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   },
   knownForRatingText: {
     fontSize: 12,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   detailsContainer: {
@@ -581,12 +581,12 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   detailValue: {
     fontSize: 14,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
   },
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { StyleSheet, Text, View, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, Image, RefreshControl } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import AppBar from '../components/AppBar';
@@ -10,10 +10,6 @@ import { searchPlaces, PlaceResult, POPULAR_CATEGORIES } from '../services/yande
 import { searchMulti, CategorizedResults, MovieResult, TVShowResult, PersonResult, getImageUrl, TMDB_CATEGORIES } from '../services/tmdbApi';
 import { searchGames, getGameImageUrl, RAWG_CATEGORIES, GameResult, formatGameReleaseDate, getPlatformNames } from '../services/rawgApi';
 import { searchBooks, getBookImageUrl, GOOGLE_BOOKS_CATEGORIES, BookResult, formatBookPublicationDate, getAuthorsString } from '../services/googleBooksApi';
-
-interface SearchScreenProps {
-  onTabPress?: (tab: string) => void;
-}
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -38,32 +34,62 @@ export default function SearchScreen() {
   const [isLoadingDiscover, setIsLoadingDiscover] = useState(false);
 
   const handleTabPress = (tab: string) => {
-    router.push(`/${tab}`);
+    if (tab === 'home') {
+      router.push('/');
+    } else if (tab === 'search') {
+      // Already on search page, do nothing
+    } else if (tab === 'discover') {
+      router.push('/discover');
+    } else if (tab === 'profile') {
+      router.push('/profile');
+    } else if (tab === 'add') {
+      router.push('/create');
+    }
   };
 
-  // Load discover content on component mount
+  // Load discover content on component mount and when active category changes
   useEffect(() => {
     loadDiscoverContent();
-  }, []);
+  }, [activeCategory]);
 
   const loadDiscoverContent = async () => {
     setIsLoadingDiscover(true);
     try {
-      // Load popular content from all categories
+      // Random search terms for varied content
+      const placeTerms = ['restaurant', 'cafe', 'hotel', 'park', 'museum', 'shopping', 'bar', 'gym', 'hospital', 'bank', 'library', 'pharmacy', 'cinema', 'theater', 'stadium', 'airport', 'school', 'market', 'bakery', 'gallery'];
+      const movieTerms = ['action', 'comedy', 'drama', 'thriller', 'adventure', 'romance', 'sci-fi', 'horror', 'animation', 'documentary', 'fantasy', 'crime', 'war', 'western', 'musical', 'biography', 'mystery', 'family', 'superhero', 'indie'];
+      const gameTerms = ['action', 'adventure', 'rpg', 'strategy', 'racing', 'sports', 'indie', 'puzzle', 'shooter', 'platformer', 'simulation', 'fighting', 'horror', 'arcade', 'casual', 'mmorpg', 'survival', 'sandbox', 'rhythm', 'card'];
+      const bookTerms = ['fiction', 'mystery', 'romance', 'thriller', 'science', 'history', 'biography', 'fantasy', 'horror', 'business', 'self-help', 'cooking', 'travel', 'poetry', 'philosophy', 'psychology', 'health', 'technology', 'art', 'education'];
+      
+      // Get random terms for each category
+      const randomPlace = placeTerms[Math.floor(Math.random() * placeTerms.length)];
+      const randomMovie = movieTerms[Math.floor(Math.random() * movieTerms.length)];
+      const randomGame = gameTerms[Math.floor(Math.random() * gameTerms.length)];
+      const randomBook = bookTerms[Math.floor(Math.random() * bookTerms.length)];
+      
+      // Load random content from all categories
       const [placesResponse, tmdbResponse, gamesResponse, booksResponse] = await Promise.all([
-        searchPlaces('restaurant'), // Popular restaurants
-        searchMulti('popular'), // Popular movies/TV/people
-        searchGames('popular'), // Popular games
-        searchBooks('bestseller') // Popular books
+        searchPlaces(randomPlace),
+        searchMulti(randomMovie),
+        searchGames(randomGame),
+        searchBooks(randomBook)
       ]);
       
+      // Randomize slice positions for variety
+      const placeStart = Math.floor(Math.random() * Math.max(1, placesResponse.results.length - 6));
+      const movieStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.movies.length - 6));
+      const tvStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.tvShows.length - 6));
+      const peopleStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.people.length - 6));
+      const gameStart = Math.floor(Math.random() * Math.max(1, (gamesResponse.results?.length || 0) - 6));
+      const bookStart = Math.floor(Math.random() * Math.max(1, (booksResponse.items?.length || 0) - 6));
+      
       setDiscoverData({
-        places: placesResponse.results.slice(0, 6),
-        movies: tmdbResponse.movies.slice(0, 6),
-        tvShows: tmdbResponse.tvShows.slice(0, 6),
-        people: tmdbResponse.people.slice(0, 6),
-        games: gamesResponse.results?.slice(0, 6) || [],
-        books: booksResponse.items?.slice(0, 6) || []
+        places: placesResponse.results.slice(placeStart, placeStart + 6),
+        movies: tmdbResponse.movies.slice(movieStart, movieStart + 6),
+        tvShows: tmdbResponse.tvShows.slice(tvStart, tvStart + 6),
+        people: tmdbResponse.people.slice(peopleStart, peopleStart + 6),
+        games: gamesResponse.results?.slice(gameStart, gameStart + 6) || [],
+        books: booksResponse.items?.slice(bookStart, bookStart + 6) || []
       });
     } catch (error) {
       console.error('Discover content load error:', error);
@@ -681,7 +707,10 @@ export default function SearchScreen() {
           </View>
         </View>
         
-        <ScrollView style={styles.resultsContainer} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.resultsContainer} 
+          showsVerticalScrollIndicator={false}
+        >
           {!hasSearched ? (
             <>
               {renderDiscoverContent()}
@@ -794,7 +823,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1F2937',
     height: 40,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
   },
   resultsContainer: {
     flex: 1,
@@ -805,7 +834,7 @@ const styles = StyleSheet.create({
   },
   categoriesTitle: {
     fontSize: 18,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 16,
   },
@@ -824,7 +853,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
   },
   // Loading state
@@ -836,7 +865,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginTop: 16,
   },
@@ -846,7 +875,7 @@ const styles = StyleSheet.create({
   },
   resultsHeader: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginBottom: 16,
   },
@@ -855,7 +884,7 @@ const styles = StyleSheet.create({
   },
   categorySectionTitle: {
     fontSize: 18,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 12,
     paddingBottom: 8,
@@ -894,19 +923,19 @@ const styles = StyleSheet.create({
   },
   placeName: {
     fontSize: 16,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 4,
   },
   placeCategory: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#F97316',
     marginBottom: 4,
   },
   placeAddress: {
     fontSize: 14,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginBottom: 8,
     lineHeight: 18,
@@ -918,7 +947,7 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#F59E0B',
     marginLeft: 4,
   },
@@ -928,7 +957,7 @@ const styles = StyleSheet.create({
   },
   hoursText: {
     fontSize: 12,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginLeft: 4,
   },
@@ -941,14 +970,14 @@ const styles = StyleSheet.create({
   },
   emptyStateTitle: {
     fontSize: 20,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 16,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
@@ -961,14 +990,14 @@ const styles = StyleSheet.create({
   },
   noResultsTitle: {
     fontSize: 20,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginTop: 16,
     marginBottom: 8,
   },
   noResultsText: {
     fontSize: 16,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
@@ -992,7 +1021,7 @@ const styles = StyleSheet.create({
   },
   categoryFilterText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginLeft: 6,
   },
@@ -1031,13 +1060,13 @@ const styles = StyleSheet.create({
   },
   mediaTitle: {
     fontSize: 14,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 4,
   },
   mediaSubtitle: {
     fontSize: 12,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginBottom: 6,
   },
@@ -1047,7 +1076,7 @@ const styles = StyleSheet.create({
   },
   discoverMainTitle: {
     fontSize: 24,
-    ...fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 20,
   },
@@ -1062,12 +1091,12 @@ const styles = StyleSheet.create({
   },
   discoverTitle: {
     fontSize: 18,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
   },
   viewAllText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#F97316',
   },
   discoverScrollView: {
@@ -1102,13 +1131,13 @@ const styles = StyleSheet.create({
   },
   discoverCardTitle: {
     fontSize: 14,
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 4,
   },
   discoverCardSubtitle: {
     fontSize: 12,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginBottom: 6,
   },
@@ -1118,7 +1147,7 @@ const styles = StyleSheet.create({
   },
   discoverRatingText: {
     fontSize: 12,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#F59E0B',
     marginLeft: 4,
   },

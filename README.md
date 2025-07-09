@@ -1,67 +1,72 @@
-# 📝 ConnectList - Social List Sharing App
+# 🎯 ConnectList - Social List Sharing App
 
-> A modern React Native app for creating, sharing, and discovering curated lists of movies, books, games, places, and more.
+> **Modern React Native uygulaması ile kişiselleştirilmiş listeler oluşturun, paylaşın ve keşfedin.**
 
 ![React Native](https://img.shields.io/badge/React%20Native-0.79.5-blue)
 ![Expo](https://img.shields.io/badge/Expo-53.0.17-black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue)
 ![Supabase](https://img.shields.io/badge/Supabase-Backend-green)
 
-## ✨ Features
+## ✨ Özellikler
 
-### 🏠 **Core Functionality**
-- **List Creation**: Create curated lists for movies, TV shows, books, games, places, and people
-- **Social Features**: Like, comment, and share lists with the community
-- **Discovery**: Explore trending lists and discover new content
-- **Search**: Multi-platform search across various content APIs
-- **Profile Management**: Complete user profiles with avatars, bios, and settings
+### 🏠 **Temel Fonksiyonlar**
+- **Liste Oluşturma**: Film, dizi, kitap, oyun, mekan ve kişiler için özelleştirilmiş listeler
+- **Sosyal Özellikler**: Beğenme, yorum yapma ve liste paylaşımı
+- **Keşfetme**: Trend listeler ve yeni içerikler keşfetme
+- **Akıllı Arama**: Çoklu platform API entegrasyonu ile gelişmiş arama
+- **Profil Yönetimi**: Avatar, biyografi ve ayarlarla kişiselleştirme
 
-### 📱 **User Experience**
-- **Instagram-style Comments**: Modern comment system with real-time updates
-- **Responsive Grid Layout**: Beautiful 3-column item display
-- **Pull-to-Refresh**: Seamless content updates
-- **Dark/Light Mode Support**: Adaptive UI design
-- **Cross-Platform**: Works on iOS, Android, and Web
+### 📱 **Kullanıcı Deneyimi**
+- **Instagram-tarzı Yorumlar**: Modern yorum sistemi ve gerçek zamanlı güncellemeler
+- **Responsive Grid Layout**: Güzel 3 sütunlu öğe görünümü
+- **Pull-to-Refresh**: Sorunsuz içerik güncellemeleri
+- **Real-time Mesajlaşma**: Canlı sohbet ve bildirim sistemi
+- **Cross-Platform**: iOS, Android ve Web desteği
 
-### 🔧 **Technical Features**
-- **Real-time Database**: Supabase PostgreSQL with real-time subscriptions
-- **Authentication**: Secure user auth with session management
-- **File Upload**: Avatar and image upload with cloud storage
-- **API Integration**: TMDB, Google Books, RAWG, Yandex Places APIs
-- **Offline Support**: Cached data and offline-first approach
+### 🔧 **Teknik Özellikler**
+- **Real-time Database**: Supabase PostgreSQL ile canlı veri senkronizasyonu
+- **Authentication**: Güvenli kullanıcı kimlik doğrulama
+- **File Upload**: Avatar ve resim yükleme ile bulut depolama
+- **API Entegrasyonu**: TMDB, Google Books, RAWG, Yandex Places, YouTube APIs
+- **Error Tracking**: Sentry ile kapsamlı hata izleme
 
-## 🚀 Quick Start
+## 🚀 Hızlı Başlangıç
 
-### Prerequisites
+### Gereksinimler
 - Node.js 18+
 - Expo CLI
-- iOS Simulator / Android Emulator (optional)
+- iOS Simulator / Android Emulator (opsiyonel)
 
-### Installation
+### Kurulum
 
 ```bash
-# Clone the repository
+# Projeyi klonlayın
 git clone https://github.com/alpereneser/connectlistApp.git
 cd connectlistApp
 
-# Install dependencies
+# Bağımlılıkları yükleyin
 npm install
 
-# Set up environment variables
+# Çevre değişkenlerini ayarlayın
 cp .env.example .env
-# Edit .env with your Supabase credentials
+# .env dosyasını API anahtarlarınızla düzenleyin
 
-# Start the development server
+# Geliştirme sunucusunu başlatın
 npm start
 ```
 
-### Environment Variables
+### Çevre Değişkenleri
 
-Create a `.env` file in the root directory:
+Kök dizinde `.env` dosyası oluşturun:
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
-EXPO_PUBLIC_SUPABASE_KEY=your_supabase_anon_key
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+EXPO_PUBLIC_TMDB_API_KEY=your_tmdb_api_key
+EXPO_PUBLIC_RAWG_API_KEY=your_rawg_api_key
+EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY=your_google_books_api_key
+EXPO_PUBLIC_YANDEX_API_KEY=your_yandex_api_key
+EXPO_PUBLIC_YOUTUBE_API_KEY=your_youtube_api_key
 ```
 
 ## 📱 Screenshots
@@ -104,33 +109,47 @@ Multi-platform content search and trending discovery
 - **Custom Components** - Reusable UI components
 - **Responsive Design** - Adaptive layouts
 
-## 📂 Project Structure
+## 📂 Proje Yapısı
 
 ```
-connectlist-expo/
-├── app/                    # Expo Router pages
-│   ├── auth/              # Authentication screens
-│   ├── details/           # Detail pages
-│   ├── list/             # List detail page
-│   ├── index.tsx         # Home feed
-│   ├── profile.tsx       # User profile
-│   ├── search.tsx        # Search & discovery
-│   ├── create.tsx        # List creation
-│   ├── settings.tsx      # User settings
-│   └── discover.tsx      # Content discovery
-├── components/            # Reusable components
-│   ├── AppBar.tsx        # Navigation header
-│   └── BottomMenu.tsx    # Bottom navigation
-├── lib/                  # Core utilities
-│   └── supabase.ts       # Database client
-├── services/             # External API services
-│   ├── tmdbApi.ts       # Movie/TV data
-│   ├── googleBooksApi.ts # Books data
-│   ├── rawgApi.ts       # Games data
-│   └── yandexApi.ts     # Places data
-├── styles/              # Global styles
-│   └── global.ts        # Typography & themes
-└── assets/              # Static assets
+connectlistApp/
+├── app/                    # Ana uygulama sayfaları (Expo Router)
+│   ├── auth/              # Kimlik doğrulama sayfaları
+│   ├── chat/              # Mesajlaşma sayfaları
+│   ├── details/           # İçerik detay sayfaları
+│   ├── topic/             # Trend topic sayfaları
+│   ├── list/             # Liste detay sayfası
+│   ├── index.tsx         # Ana sayfa feed
+│   ├── profile.tsx       # Kullanıcı profili
+│   ├── search.tsx        # Arama ve keşfetme
+│   ├── create.tsx        # Liste oluşturma
+│   ├── messages.tsx      # Mesajlar ana sayfası
+│   ├── notifications.tsx # Bildirimler
+│   ├── settings.tsx      # Kullanıcı ayarları
+│   ├── discover.tsx      # İçerik keşfetme
+│   ├── privacy-policy.tsx # Gizlilik politikası
+│   └── terms-of-service.tsx # Kullanım şartları
+├── components/            # Yeniden kullanılabilir bileşenler
+│   ├── AppBar.tsx        # Navigasyon başlığı
+│   ├── BottomMenu.tsx    # Alt navigasyon
+│   └── ErrorBoundary.tsx # Hata sınır bileşeni
+├── lib/                  # Temel yardımcı araçlar
+│   ├── supabase.ts       # Veritabanı istemcisi
+│   └── sentry.ts         # Hata izleme
+├── services/             # Harici API servisleri
+│   ├── tmdbApi.ts       # Film/Dizi verileri
+│   ├── googleBooksApi.ts # Kitap verileri
+│   ├── rawgApi.ts       # Oyun verileri
+│   ├── yandexApi.ts     # Mekan verileri
+│   └── youtubeApi.ts    # Video verileri
+├── styles/              # Global stiller
+│   ├── global.ts        # Tipografi ve temalar
+│   └── fonts.css        # Font dosyaları
+├── utils/               # Yardımcı fonksiyonlar
+│   └── errorHandler.ts  # Hata yönetimi
+├── supabase/           # Veritabanı migration dosyaları
+└── assets/             # Statik dosyalar
+    └── images/         # Uygulama görselleri
 ```
 
 ## 🗄️ Database Schema
@@ -186,81 +205,100 @@ eas build --platform all
 eas submit --platform all
 ```
 
-## 🌟 Key Features Showcase
+## 🌟 Ana Özellikler Showcase
 
-### 📋 **List Management**
-Create and organize lists across multiple categories with rich metadata and media integration.
+### 📋 **Liste Yönetimi**
+- **Kategori Bazlı Listeler**: Film, dizi, kitap, oyun, mekan ve kişiler
+- **İçerik Ekleme**: Liste sahipleri için gerçek zamanlı arama
+- **Drag & Drop Sıralama**: Kolay öğe yeniden düzenleme
+- **Gizlilik Ayarları**: Herkese açık, arkadaşlar, özel seçenekleri
 
-### 💬 **Social Interactions**
-- Instagram-style comment system
-- Real-time like/unlike functionality  
-- Cross-platform sharing capabilities
-- User following and discovery
+### 💬 **Sosyal Etkileşimler**
+- **Instagram-tarzı Yorum Sistemi**: Modern yorum arayüzü
+- **Gerçek Zamanlı Beğeni**: Anlık like/unlike işlemleri
+- **Çapraz Platform Paylaşım**: Sosyal medya entegrasyonu
+- **Kullanıcı Takibi**: Keşfetme ve takip sistemi
+- **QR Kod Paylaşımı**: Liste paylaşımı için QR kod
 
-### 🔍 **Smart Search**
-Integrated search across multiple content platforms:
-- Movies & TV via TMDB
-- Books via Google Books
-- Games via RAWG  
-- Places via Yandex
+### 🔍 **Akıllı Arama**
+Çoklu platform entegrasyonu ile gelişmiş arama:
+- **Filmler & Diziler**: TMDB API ile
+- **Kitaplar**: Google Books API ile
+- **Oyunlar**: RAWG API ile
+- **Mekanlar**: Yandex Places API ile
+- **Videolar**: YouTube API ile
 
-### 👤 **Rich Profiles**
-- Avatar upload and management
-- Bio and social links
-- Privacy settings
-- Activity feeds
+### 💬 **Mesajlaşma Sistemi**
+- **Gerçek Zamanlı Sohbet**: WebSocket tabanlı anlık mesajlaşma
+- **Yazıyor Göstergesi**: Karşı tarafın yazma durumu
+- **Online/Offline Durumu**: Kullanıcı aktiflik göstergesi
+- **Mesaj Durumu**: Gönderildi, okundu işaretleri
 
-## 🚧 Roadmap
+### 🔔 **Bildirim Sistemi**
+- **Gerçek Zamanlı Bildirimler**: Anlık notification sistemi
+- **Kategori Filtreleme**: Bildirim türlerine göre sıralama
+- **Toplu İşlemler**: Hepsini okundu işaretle
+- **Bildirim Geçmişi**: Detaylı takip sistemi
 
-- [ ] **Push Notifications** - Real-time notifications for social interactions
-- [ ] **Collaborative Lists** - Multi-user list editing
-- [ ] **Advanced Search** - Filters and sorting options
-- [ ] **AI Recommendations** - Smart content suggestions
-- [ ] **List Templates** - Pre-made list templates
-- [ ] **Export Features** - Export lists to various formats
+## 🚧 Gelecek Özellikler
 
-## 🤝 Contributing
+- [x] **Gerçek Zamanlı Mesajlaşma** - Canlı sohbet sistemi ✅
+- [x] **Gerçek Zamanlı Bildirimler** - Anlık notification sistemi ✅
+- [x] **İçerik Ekleme** - Liste sahipleri için dinamik içerik ekleme ✅
+- [ ] **Push Notifications** - Mobil push notification desteği
+- [ ] **İş Birlikli Listeler** - Çoklu kullanıcı liste düzenleme
+- [ ] **Gelişmiş Arama** - Filtreler ve sıralama seçenekleri
+- [ ] **AI Önerileri** - Akıllı içerik önerileri
+- [ ] **Liste Şablonları** - Hazır liste şablonları
+- [ ] **Dışa Aktarma** - Listeleri çeşitli formatlarda kaydetme
 
-We welcome contributions! Please follow these steps:
+## 🤝 Katkıda Bulunma
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Katkılarınızı memnuniyetle karşılıyoruz! Lütfen şu adımları takip edin:
 
-### Development Guidelines
-- Follow TypeScript best practices
-- Write meaningful commit messages
-- Test on multiple platforms
-- Update documentation as needed
+1. Repository'yi fork edin
+2. Feature branch oluşturun (`git checkout -b feature/harika-ozellik`)
+3. Değişikliklerinizi commit edin (`git commit -m 'Harika özellik eklendi'`)
+4. Branch'inizi push edin (`git push origin feature/harika-ozellik`)
+5. Pull Request açın
 
-## 📄 License
+### Geliştirme Kuralları
+- TypeScript best practice'lerini takip edin
+- Anlamlı commit mesajları yazın
+- Çoklu platformlarda test edin
+- Dokümantasyonu güncelleyin
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 📄 Lisans
 
-## 🙏 Acknowledgments
+Bu proje MIT Lisansı altında lisanslanmıştır - detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
-- **Expo Team** - Amazing development platform
-- **Supabase** - Excellent backend solution
-- **TMDB** - Movie and TV data
-- **Google Books** - Books API
-- **RAWG** - Video games database
-- **Phosphor Icons** - Beautiful icon library
+## 🙏 Teşekkürler
 
-## 📞 Support
+- **Tech Istanbul** - Kuluçka merkezi desteği
+- **Bilgiyi Ticaretleştirme Merkezi** - Teknoloji transfer desteği
+- **Expo Team** - Harika geliştirme platformu
+- **Supabase** - Mükemmel backend çözümü
+- **TMDB** - Film ve dizi verileri
+- **Google Books** - Kitap API'si
+- **RAWG** - Video oyunları veritabanı
+- **Yandex** - Mekan verileri
+- **Phosphor Icons** - Güzel ikon kütüphanesi
 
-- 📧 Email: support@connectlist.app
+## 📞 Destek
+
+- 📧 Email: support@connectlist.me
 - 🐛 Issues: [GitHub Issues](https://github.com/alpereneser/connectlistApp/issues)
 - 💬 Discussions: [GitHub Discussions](https://github.com/alpereneser/connectlistApp/discussions)
+
+## 👨‍💻 Geliştirici
+
+**Alperen Eser**
+- GitHub: [@alpereneser](https://github.com/alpereneser)
+- Email: support@connectlist.me
 
 ---
 
 <div align="center">
-  <p>Made with ❤️ by the ConnectList Team</p>
-  <p>
-    <a href="https://connectlist.app">Website</a> •
-    <a href="https://twitter.com/connectlist">Twitter</a> •
-    <a href="https://instagram.com/connectlist">Instagram</a>
-  </p>
+  <p><strong>🎯 ConnectList ile listelerinizi paylaşın, keşfedin ve bağlantı kurun!</strong></p>
+  <p>Made with ❤️ in Istanbul, Turkey</p>
 </div>

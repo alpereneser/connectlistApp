@@ -26,6 +26,7 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const router = useRouter();
 
 
@@ -42,6 +43,11 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     // Form validation
+    if (!acceptedTerms) {
+      Alert.alert('Error', 'Please accept the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
+    
     if (!fullName.trim()) {
       Alert.alert('Error', 'Please enter your full name.');
       return;
@@ -249,11 +255,39 @@ export default function RegisterScreen() {
             </View>
           </View>
 
+          {/* Terms and Privacy Agreement */}
+          <View style={styles.termsContainer}>
+            <TouchableOpacity 
+              style={styles.checkboxContainer} 
+              onPress={() => setAcceptedTerms(!acceptedTerms)}
+            >
+              <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
+                {acceptedTerms && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.termsText}>
+                I agree to the{' '}
+                <Text 
+                  style={styles.linkText}
+                  onPress={() => router.push('/terms-of-service')}
+                >
+                  Terms of Service
+                </Text>
+                {' '}and{' '}
+                <Text 
+                  style={styles.linkText}
+                  onPress={() => router.push('/privacy-policy')}
+                >
+                  Privacy Policy
+                </Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Register Button */}
           <TouchableOpacity
-            style={[styles.registerButton, loading && styles.disabledButton]}
+            style={[styles.registerButton, (loading || !acceptedTerms) && styles.disabledButton]}
             onPress={handleRegister}
-            disabled={loading}
+            disabled={loading || !acceptedTerms}
           >
             <Text style={styles.registerButtonText}>
               {loading ? 'Creating Account...' : 'Sign Up'}
@@ -295,13 +329,13 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 28,
-    fontFamily: fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 8,
   },
   subtitleText: {
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   form: {
@@ -326,7 +360,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#1F2937',
   },
   eyeIcon: {
@@ -345,7 +379,7 @@ const styles = StyleSheet.create({
   },
   registerButtonText: {
     fontSize: 16,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
   loginContainer: {
@@ -355,12 +389,51 @@ const styles = StyleSheet.create({
   },
   loginText: {
     fontSize: 14,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   loginLink: {
     fontSize: 14,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FF6B35',
+  },
+  termsContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    borderRadius: 4,
+    marginRight: 12,
+    marginTop: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter',
+    color: '#6B7280',
+    lineHeight: 20,
+  },
+  linkText: {
+    color: '#FF6B35',
+    textDecorationLine: 'underline',
   },
 });

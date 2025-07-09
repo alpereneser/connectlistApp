@@ -953,8 +953,20 @@ export default function SettingsScreen() {
           
           {renderSettingsItem(
             <Question size={20} color="#333" />,
-            'Help',
+            'Help & Support',
             () => handleMenuPress('Help')
+          )}
+          
+          {renderSettingsItem(
+            <Globe size={20} color="#333" />,
+            'Privacy Policy',
+            () => router.push('/privacy-policy')
+          )}
+          
+          {renderSettingsItem(
+            <Globe size={20} color="#333" />,
+            'Terms of Service',
+            () => router.push('/terms-of-service')
           )}
           
           {renderSettingsItem(
@@ -1048,13 +1060,13 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 16,
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#000000',
     marginBottom: 4,
   },
   profileBio: {
     fontSize: 14,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#666666',
     lineHeight: 18,
   },
@@ -1063,7 +1075,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#000000',
     marginBottom: 16,
     paddingHorizontal: 4,
@@ -1091,7 +1103,7 @@ const styles = StyleSheet.create({
   },
   settingsItemText: {
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#000000',
     flex: 1,
   },
@@ -1104,7 +1116,7 @@ const styles = StyleSheet.create({
   },
   signOutText: {
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#000000',
     textAlign: 'left',
   },
@@ -1125,7 +1137,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontFamily: fontConfig.semibold,
+    fontFamily: 'Inter',
     color: '#000000',
   },
   modalContent: {
@@ -1170,7 +1182,7 @@ const styles = StyleSheet.create({
   },
   changePhotoText: {
     fontSize: 14,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#007AFF',
   },
   formSection: {
@@ -1181,7 +1193,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#666666',
     marginBottom: 8,
   },
@@ -1192,7 +1204,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#000000',
     backgroundColor: '#FFFFFF',
   },
@@ -1207,7 +1219,7 @@ const styles = StyleSheet.create({
   },
   characterCount: {
     fontSize: 12,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#999',
     textAlign: 'right',
     marginTop: 4,
@@ -1227,7 +1239,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#000000',
   },
   genderOptions: {
@@ -1249,7 +1261,7 @@ const styles = StyleSheet.create({
   },
   genderOptionText: {
     fontSize: 14,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#666666',
   },
   genderOptionTextActive: {
@@ -1263,7 +1275,7 @@ const styles = StyleSheet.create({
   },
   switchLabel: {
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#000000',
   },
   
@@ -1294,7 +1306,7 @@ const styles = StyleSheet.create({
   },
   radioText: {
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#000000',
   },
 });

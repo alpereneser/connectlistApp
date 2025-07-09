@@ -1,25 +1,39 @@
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import AppBar from '../components/AppBar';
 import BottomMenu from '../components/BottomMenu';
 import { fontConfig } from '../styles/global';
-import { MapPin, FilmStrip, Television, BookOpen, GameController, User } from 'phosphor-react-native';
+import { MapPin, FilmStrip, Television, BookOpen, GameController, User, PlayCircle } from 'phosphor-react-native';
 
-interface CreateScreenProps {
-  onTabPress?: (tab: string) => void;
-}
-
-export default function CreateScreen({ onTabPress }: CreateScreenProps) {
+export default function CreateScreen() {
+  const router = useRouter();
+  
   const handleTabPress = (tab: string) => {
-    onTabPress?.(tab);
+    if (tab === 'home') {
+      router.push('/');
+    } else if (tab === 'search') {
+      router.push('/search');
+    } else if (tab === 'discover') {
+      router.push('/discover');
+    } else if (tab === 'profile') {
+      router.push('/profile');
+    } else if (tab === 'add') {
+      // Already on create page, do nothing
+    }
+  };
+
+  const handleCategorySelect = (category: string) => {
+    router.push(`/create-list?category=${category.toLowerCase()}`);
   };
 
   const categories = [
-    { icon: MapPin, title: 'Places', color: '#FF6B35', description: 'Restaurants, cafes, travel destinations' },
-    { icon: FilmStrip, title: 'Movies', color: '#F97316', description: 'Films, documentaries, cinema experiences' },
-    { icon: Television, title: 'TV Shows', color: '#EA580C', description: 'Series, episodes, streaming content' },
-    { icon: BookOpen, title: 'Books', color: '#DC2626', description: 'Novels, non-fiction, reading lists' },
-    { icon: GameController, title: 'Games', color: '#F59E0B', description: 'Video games, board games, activities' },
-    { icon: User, title: 'Person', color: '#FB923C', description: 'People, celebrities, influencers' },
+    { icon: MapPin, title: 'Places', color: '#FF6B35', description: 'Restaurants, cafes, travel destinations', key: 'places' },
+    { icon: FilmStrip, title: 'Movies', color: '#F97316', description: 'Films, documentaries, cinema experiences', key: 'movies' },
+    { icon: Television, title: 'TV Shows', color: '#EA580C', description: 'Series, episodes, streaming content', key: 'tv_shows' },
+    { icon: BookOpen, title: 'Books', color: '#DC2626', description: 'Novels, non-fiction, reading lists', key: 'books' },
+    { icon: GameController, title: 'Games', color: '#F59E0B', description: 'Video games, board games, activities', key: 'games' },
+    { icon: PlayCircle, title: 'Videos', color: '#EF4444', description: 'YouTube videos, tutorials, vlogs', key: 'videos' },
+    { icon: User, title: 'Person', color: '#FB923C', description: 'People, celebrities, influencers', key: 'person' },
   ];
 
   return (
@@ -39,9 +53,14 @@ export default function CreateScreen({ onTabPress }: CreateScreenProps) {
           {/* Category Selection */}
           <View style={styles.categoriesGrid}>
             {categories.map((category, index) => (
-              <TouchableOpacity key={index} style={styles.categoryCard}>
-                <View style={styles.categoryIcon}>
-                  <category.icon size={32} color={category.color} />
+              <TouchableOpacity 
+                key={index} 
+                style={styles.categoryCard}
+                onPress={() => handleCategorySelect(category.key)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.categoryIcon, { backgroundColor: `${category.color}20` }]}>
+                  <category.icon size={24} color={category.color} />
                 </View>
                 <Text style={styles.categoryTitle}>{category.title}</Text>
                 <Text style={styles.categoryDescription}>{category.description}</Text>
@@ -70,69 +89,70 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerSection: {
-    marginBottom: 30,
+    marginBottom: 20,
     paddingHorizontal: 4,
-    paddingVertical: 20,
+    paddingVertical: 15,
   },
   mainTitle: {
-    ...fontConfig.bold,
-    fontSize: 28,
+    fontFamily: 'Inter',
+    fontSize: 24,
     color: '#1f2937',
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
-    ...fontConfig.regular,
-    fontSize: 16,
+    fontFamily: 'Inter',
+    fontSize: 14,
     color: '#6b7280',
-    lineHeight: 24,
+    lineHeight: 20,
     textAlign: 'center',
   },
   categoriesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
     paddingBottom: 20,
-    gap: 15,
+    gap: 8,
   },
   categoryCard: {
-     width: '45%',
+     width: '47%',
      backgroundColor: '#f8f9fa',
-     borderRadius: 12,
-     padding: 20,
+     borderRadius: 10,
+     padding: 14,
      alignItems: 'center',
      borderWidth: 1,
      borderColor: '#e9ecef',
      shadowColor: '#000',
      shadowOffset: {
        width: 0,
-       height: 2,
+       height: 1,
      },
-     shadowOpacity: 0.1,
-     shadowRadius: 4,
-     elevation: 3,
+     shadowOpacity: 0.05,
+     shadowRadius: 2,
+     elevation: 2,
+     minHeight: 100,
    },
   categoryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   categoryTitle: {
-     ...fontConfig.semibold,
-     fontSize: 16,
+     fontFamily: 'Inter',
+     fontSize: 14,
      color: '#1f2937',
-     marginBottom: 8,
+     marginBottom: 4,
      textAlign: 'center',
    },
   categoryDescription: {
-     ...fontConfig.regular,
-     fontSize: 12,
+     fontFamily: 'Inter',
+     fontSize: 11,
      color: '#6b7280',
-     lineHeight: 16,
+     lineHeight: 14,
      textAlign: 'center',
    },
 });

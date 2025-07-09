@@ -15,6 +15,8 @@ import {
   TextInput,
   KeyboardAvoidingView,
   FlatList,
+  PanResponder,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
@@ -31,13 +33,30 @@ import {
   Lock,
   Globe,
   X,
-  PaperPlaneRight
+  PaperPlaneRight,
+  DotsThreeVertical,
+  PencilSimple,
+  Trash,
+  Plus,
+  Check,
+  Star,
+  StarOutline,
+  QrCode,
+  Share as ShareOutline,
+  DotsSixVertical,
+  ArrowsOutCardinal,
+  MagnifyingGlass
 } from 'phosphor-react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AppBar from '../../components/AppBar';
 import BottomMenu from '../../components/BottomMenu';
 import { fontConfig } from '../../styles/global';
 import { supabase } from '../../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { searchPlaces, PlaceResult } from '../../services/yandexApi';
+import { searchMulti, MovieResult, TVShowResult, PersonResult, getImageUrl } from '../../services/tmdbApi';
+import { searchGames, GameResult, getGameImageUrl } from '../../services/rawgApi';
+import { searchBooks, BookResult, getBookImageUrl } from '../../services/googleBooksApi';
 
 const { width: screenWidth } = Dimensions.get('window');
 const itemWidth = (screenWidth - 60) / 3; // 3 columns with padding
@@ -112,11 +131,65 @@ export default function ListDetailScreen() {
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
+  
+  // Edit list modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [saving, setSaving] = useState(false);
+  
+  // Delete confirmation modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  
+  // Following state
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  
+  // Options menu state
+  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  
+  // QR code modal state
+  const [showQRModal, setShowQRModal] = useState(false);
+  
+  // Reorder mode state
+  const [reorderMode, setReorderMode] = useState(false);
+  const [showAddContentModal, setShowAddContentModal] = useState(false);
+  const [contentSearchQuery, setContentSearchQuery] = useState('');
+  const [contentSearchResults, setContentSearchResults] = useState<any[]>([]);
+  const [isSearchingContent, setIsSearchingContent] = useState(false);
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState(new Animated.Value(0));
+  
+  // Offline support state
+  const [isOffline, setIsOffline] = useState(false);
+  const [offlineData, setOfflineData] = useState<any>(null);
 
   useEffect(() => {
     fetchCurrentUser();
     fetchListDetail();
+    loadOfflineData();
   }, [id]);
+
+  const loadOfflineData = async () => {
+    try {
+      const cachedData = await AsyncStorage.getItem(`list_${id}`);
+      if (cachedData) {
+        setOfflineData(JSON.parse(cachedData));
+      }
+    } catch (error) {
+      console.error('Error loading offline data:', error);
+    }
+  };
+
+  const saveOfflineData = async (data: any) => {
+    try {
+      await AsyncStorage.setItem(`list_${id}`, JSON.stringify(data));
+    } catch (error) {
+      console.error('Error saving offline data:', error);
+    }
+  };
 
   const fetchCurrentUser = async () => {
     try {
@@ -133,6 +206,16 @@ export default function ListDetailScreen() {
           .single();
         
         setIsLiked(!!listLike);
+        
+        // Check if user is following this list
+        const { data: followData } = await supabase
+          .from('list_follows')
+          .select('id')
+          .eq('list_id', id)
+          .eq('user_id', user.id)
+          .single();
+        
+        setIsFollowing(!!followData);
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -143,6 +226,27 @@ export default function ListDetailScreen() {
     try {
       setLoading(true);
       
+      // Check if we're offline by trying a quick request
+      let isOnline = true;
+      try {
+        await fetch('https://www.google.com', { 
+          method: 'HEAD',
+          mode: 'no-cors',
+          cache: 'no-cache'
+        });
+      } catch (error) {
+        isOnline = false;
+        setIsOffline(true);
+      }
+      
+      // If offline, use cached data
+      if (!isOnline && offlineData) {
+        setListDetail(offlineData.listDetail);
+        setListItems(offlineData.listItems);
+        setLoading(false);
+        return;
+      }
+      
       // Fetch list details
       const { data: listData, error: listError } = await supabase
         .from('lists')
@@ -152,6 +256,14 @@ export default function ListDetailScreen() {
 
       if (listError) {
         console.error('Error fetching list:', listError);
+        // Try to use cached data as fallback
+        if (offlineData) {
+          setListDetail(offlineData.listDetail);
+          setListItems(offlineData.listItems);
+          setIsOffline(true);
+          setLoading(false);
+          return;
+        }
         Alert.alert('Error', 'Failed to load list details');
         return;
       }
@@ -191,6 +303,15 @@ export default function ListDetailScreen() {
         } else {
           setListItems(itemsData || []);
         }
+        
+        // Save to offline cache
+        const cacheData = {
+          listDetail: enrichedList,
+          listItems: itemsData || [],
+          timestamp: Date.now()
+        };
+        await saveOfflineData(cacheData);
+        setIsOffline(false);
 
         // Fetch user's liked items if logged in (if table exists)
         if (currentUser && itemsData && itemsData.length > 0) {
@@ -362,12 +483,17 @@ export default function ListDetailScreen() {
     try {
       setLoadingComments(true);
       
+      console.log('Fetching comments for list:', id);
+      
       // Fetch comments first
       const { data: commentsData, error } = await supabase
         .from('list_comments')
         .select('*')
         .eq('list_id', id)
         .order('created_at', { ascending: true });
+
+      console.log('Comments data:', commentsData);
+      console.log('Comments error:', error);
 
       if (error) {
         console.error('Error fetching comments:', error);
@@ -393,6 +519,7 @@ export default function ListDetailScreen() {
           users_profiles: usersMap[comment.user_id] || null
         }));
 
+        console.log('Enriched comments:', enrichedComments);
         setComments(enrichedComments);
       } else {
         setComments([]);
@@ -421,7 +548,7 @@ export default function ListDetailScreen() {
     try {
       setPostingComment(true);
       
-      // Insert comment first
+      // Simple comment insert - Instagram style
       const { data: commentData, error } = await supabase
         .from('list_comments')
         .insert({
@@ -429,7 +556,19 @@ export default function ListDetailScreen() {
           user_id: currentUser.id,
           list_id: listDetail.id
         })
-        .select('*')
+        .select(`
+          id,
+          content,
+          created_at,
+          user_id,
+          list_id,
+          users_profiles:user_id (
+            id,
+            username,
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) {
@@ -438,23 +577,11 @@ export default function ListDetailScreen() {
         return;
       }
 
-      // Get user profile separately
-      const { data: userProfile } = await supabase
-        .from('users_profiles')
-        .select('id, username, full_name, avatar_url')
-        .eq('id', currentUser.id)
-        .single();
-
-      // Combine comment with user profile
-      const enrichedComment = {
-        ...commentData,
-        users_profiles: userProfile
-      };
-
-      setComments(prev => [...prev, enrichedComment]);
+      // Add new comment to UI immediately
+      setComments(prev => [...prev, commentData]);
       setNewComment('');
       
-      // Update comments count
+      // Update comments count manually (trigger will also update DB)
       setListDetail({
         ...listDetail,
         comments_count: listDetail.comments_count + 1
@@ -531,6 +658,532 @@ export default function ListDetailScreen() {
       }
     } catch (error) {
       console.error('Error sharing:', error);
+    }
+  };
+
+  const handleEditList = () => {
+    if (!listDetail) return;
+    
+    setEditTitle(listDetail.title);
+    setEditDescription(listDetail.description || '');
+    setShowEditModal(true);
+    setShowOptionsMenu(false);
+  };
+
+  const saveListChanges = async () => {
+    if (!listDetail || !currentUser || !editTitle.trim()) return;
+    
+    try {
+      setSaving(true);
+      
+      const { error } = await supabase
+        .from('lists')
+        .update({
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', listDetail.id);
+
+      if (error) {
+        console.error('Error updating list:', error);
+        Alert.alert('Error', 'Failed to update list');
+        return;
+      }
+
+      setListDetail({
+        ...listDetail,
+        title: editTitle.trim(),
+        description: editDescription.trim() || undefined
+      });
+      
+      setShowEditModal(false);
+      Alert.alert('Success', 'List updated successfully');
+      
+    } catch (error) {
+      console.error('Error updating list:', error);
+      Alert.alert('Error', 'Failed to update list');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteList = () => {
+    setShowDeleteModal(true);
+    setShowOptionsMenu(false);
+  };
+
+  const confirmDeleteList = async () => {
+    if (!listDetail || !currentUser) return;
+    
+    try {
+      setDeleting(true);
+      
+      // Delete list items first
+      const { error: itemsError } = await supabase
+        .from('list_items')
+        .delete()
+        .eq('list_id', listDetail.id);
+
+      if (itemsError) {
+        console.error('Error deleting list items:', itemsError);
+        Alert.alert('Error', 'Failed to delete list');
+        return;
+      }
+
+      // Delete list comments
+      const { error: commentsError } = await supabase
+        .from('list_comments')
+        .delete()
+        .eq('list_id', listDetail.id);
+
+      if (commentsError) {
+        console.log('Error deleting comments (might not exist):', commentsError);
+      }
+
+      // Delete list likes
+      const { error: likesError } = await supabase
+        .from('list_likes')
+        .delete()
+        .eq('list_id', listDetail.id);
+
+      if (likesError) {
+        console.log('Error deleting likes (might not exist):', likesError);
+      }
+
+      // Delete list follows
+      const { error: followsError } = await supabase
+        .from('list_follows')
+        .delete()
+        .eq('list_id', listDetail.id);
+
+      if (followsError) {
+        console.log('Error deleting follows (might not exist):', followsError);
+      }
+
+      // Finally delete the list
+      const { error: listError } = await supabase
+        .from('lists')
+        .delete()
+        .eq('id', listDetail.id);
+
+      if (listError) {
+        console.error('Error deleting list:', listError);
+        Alert.alert('Error', 'Failed to delete list');
+        return;
+      }
+      
+      Alert.alert('Success', 'List deleted successfully', [
+        { text: 'OK', onPress: () => router.push('/') }
+      ]);
+      
+    } catch (error) {
+      console.error('Error deleting list:', error);
+      Alert.alert('Error', 'Failed to delete list');
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleFollowList = async () => {
+    if (!currentUser || !listDetail) {
+      Alert.alert('Login Required', 'Please login to follow lists');
+      return;
+    }
+
+    try {
+      setFollowLoading(true);
+      
+      if (isFollowing) {
+        // Unfollow list
+        const { error } = await supabase
+          .from('list_follows')
+          .delete()
+          .eq('list_id', listDetail.id)
+          .eq('user_id', currentUser.id);
+
+        if (error) {
+          console.error('Error unfollowing list:', error);
+          Alert.alert('Error', 'Failed to unfollow list');
+          return;
+        }
+
+        setIsFollowing(false);
+      } else {
+        // Follow list
+        const { error } = await supabase
+          .from('list_follows')
+          .insert({
+            list_id: listDetail.id,
+            user_id: currentUser.id
+          });
+
+        if (error) {
+          console.error('Error following list:', error);
+          Alert.alert('Error', 'Failed to follow list');
+          return;
+        }
+
+        setIsFollowing(true);
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+      Alert.alert('Error', 'Failed to update follow status');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleShareWithStats = async (item?: ListItem) => {
+    try {
+      // Update share count in database
+      if (item) {
+        await supabase
+          .from('list_items')
+          .update({ shares_count: (item.shares_count || 0) + 1 })
+          .eq('id', item.id);
+        
+        // Update local state
+        setListItems(items => 
+          items.map(i => 
+            i.id === item.id 
+              ? { ...i, shares_count: (i.shares_count || 0) + 1 }
+              : i
+          )
+        );
+      } else if (listDetail) {
+        await supabase
+          .from('lists')
+          .update({ shares_count: (listDetail.shares_count || 0) + 1 })
+          .eq('id', listDetail.id);
+        
+        // Update local state
+        setListDetail({
+          ...listDetail,
+          shares_count: (listDetail.shares_count || 0) + 1
+        });
+      }
+      
+      // Call original share function
+      await handleShare(item);
+      
+    } catch (error) {
+      console.error('Error updating share stats:', error);
+      // Still proceed with sharing even if stats update fails
+      await handleShare(item);
+    }
+  };
+
+  const generateQRCode = () => {
+    setShowQRModal(true);
+  };
+
+  const toggleReorderMode = () => {
+    setReorderMode(!reorderMode);
+    setShowOptionsMenu(false);
+  };
+
+  const moveItem = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    
+    const newItems = [...listItems];
+    const [movedItem] = newItems.splice(fromIndex, 1);
+    newItems.splice(toIndex, 0, movedItem);
+    
+    // Update positions
+    const updatedItems = newItems.map((item, index) => ({
+      ...item,
+      position: index
+    }));
+    
+    setListItems(updatedItems);
+    return updatedItems;
+  };
+
+  const saveItemOrder = async (updatedItems: ListItem[]) => {
+    try {
+      // Update positions in database
+      const updates = updatedItems.map(item => ({
+        id: item.id,
+        position: item.position
+      }));
+
+      for (const update of updates) {
+        await supabase
+          .from('list_items')
+          .update({ position: update.position })
+          .eq('id', update.id);
+      }
+    } catch (error) {
+      console.error('Error saving item order:', error);
+      Alert.alert('Error', 'Failed to save item order');
+    }
+  };
+
+  const deleteItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from('list_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) {
+        console.error('Error deleting item:', error);
+        Alert.alert('Error', 'Failed to delete item');
+        return;
+      }
+
+      // Remove from local state
+      const newItems = listItems.filter(item => item.id !== itemId);
+      setListItems(newItems);
+      
+      // Update list item count
+      if (listDetail) {
+        setListDetail({
+          ...listDetail,
+          item_count: Math.max(0, listDetail.item_count - 1)
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      Alert.alert('Error', 'Failed to delete item');
+    }
+  };
+
+  const isListOwner = currentUser && listDetail && currentUser.id === listDetail.creator_id;
+
+  const searchContent = async (query: string) => {
+    if (!query.trim() || !listDetail) return;
+    
+    setIsSearchingContent(true);
+    try {
+      let results: any[] = [];
+      
+      const category = listDetail.category;
+      
+      // Search based on list category
+      switch (category) {
+        case 'movies':
+          const movieResults = await searchMulti(query, 1);
+          results = movieResults.filter((item: any) => item.media_type === 'movie').map((movie: MovieResult) => ({
+            id: movie.id,
+            content_id: movie.id.toString(),
+            content_type: 'movie',
+            type: 'movie',
+            title: movie.title,
+            subtitle: movie.release_date ? new Date(movie.release_date).getFullYear().toString() : '',
+            description: movie.overview,
+            image_url: movie.poster_path ? getImageUrl(movie.poster_path) : undefined,
+            external_data: movie
+          }));
+          break;
+          
+        case 'tv_shows':
+          const tvResults = await searchMulti(query, 1);
+          results = tvResults.filter((item: any) => item.media_type === 'tv').map((tv: TVShowResult) => ({
+            id: tv.id,
+            content_id: tv.id.toString(),
+            content_type: 'tv',
+            type: 'tv',
+            title: tv.name,
+            subtitle: tv.first_air_date ? new Date(tv.first_air_date).getFullYear().toString() : '',
+            description: tv.overview,
+            image_url: tv.poster_path ? getImageUrl(tv.poster_path) : undefined,
+            external_data: tv
+          }));
+          break;
+          
+        case 'books':
+          const bookResults = await searchBooks(query);
+          results = bookResults.map((book: BookResult) => ({
+            id: book.id,
+            content_id: book.id,
+            content_type: 'book',
+            type: 'book',
+            title: book.volumeInfo?.title || '',
+            subtitle: book.volumeInfo?.authors?.join(', ') || '',
+            description: book.volumeInfo?.description || '',
+            image_url: getBookImageUrl(book),
+            external_data: book
+          }));
+          break;
+          
+        case 'games':
+          const gameResults = await searchGames(query);
+          results = gameResults.map((game: GameResult) => ({
+            id: game.id,
+            content_id: game.id.toString(),
+            content_type: 'game',
+            type: 'game',
+            title: game.name,
+            subtitle: game.released || '',
+            description: game.description_raw || '',
+            image_url: getGameImageUrl(game),
+            external_data: game
+          }));
+          break;
+          
+        case 'places':
+          const placeResults = await searchPlaces(query);
+          results = placeResults.map((place: PlaceResult) => ({
+            id: place.properties?.CompanyMetaData?.id || Math.random().toString(),
+            content_id: place.properties?.CompanyMetaData?.id || Math.random().toString(),
+            content_type: 'place',
+            type: 'place',
+            title: place.properties?.name || place.properties?.description || '',
+            subtitle: place.properties?.CompanyMetaData?.address || '',
+            description: place.properties?.description || '',
+            image_url: undefined,
+            external_data: place
+          }));
+          break;
+          
+        case 'persons':
+          const personResults = await searchMulti(query, 1);
+          results = personResults.filter((item: any) => item.media_type === 'person').map((person: PersonResult) => ({
+            id: person.id,
+            content_id: person.id.toString(),
+            content_type: 'person',
+            type: 'person',
+            title: person.name,
+            subtitle: person.known_for_department || '',
+            description: '',
+            image_url: person.profile_path ? getImageUrl(person.profile_path) : undefined,
+            external_data: person
+          }));
+          break;
+          
+        default:
+          // For general category, search all types
+          const allResults = await searchMulti(query, 1);
+          results = allResults.map((item: any) => {
+            if (item.media_type === 'movie') {
+              return {
+                id: item.id,
+                content_id: item.id.toString(),
+                content_type: 'movie',
+                type: 'movie',
+                title: item.title,
+                subtitle: item.release_date ? new Date(item.release_date).getFullYear().toString() : '',
+                description: item.overview,
+                image_url: item.poster_path ? getImageUrl(item.poster_path) : undefined,
+                external_data: item
+              };
+            } else if (item.media_type === 'tv') {
+              return {
+                id: item.id,
+                content_id: item.id.toString(),
+                content_type: 'tv',
+                type: 'tv',
+                title: item.name,
+                subtitle: item.first_air_date ? new Date(item.first_air_date).getFullYear().toString() : '',
+                description: item.overview,
+                image_url: item.poster_path ? getImageUrl(item.poster_path) : undefined,
+                external_data: item
+              };
+            } else if (item.media_type === 'person') {
+              return {
+                id: item.id,
+                content_id: item.id.toString(),
+                content_type: 'person',
+                type: 'person',
+                title: item.name,
+                subtitle: item.known_for_department || '',
+                description: '',
+                image_url: item.profile_path ? getImageUrl(item.profile_path) : undefined,
+                external_data: item
+              };
+            }
+            return null;
+          }).filter(Boolean);
+      }
+      
+      setContentSearchResults(results);
+    } catch (error) {
+      console.error('Error searching content:', error);
+      Alert.alert('Error', 'Failed to search content');
+    } finally {
+      setIsSearchingContent(false);
+    }
+  };
+
+  const handleContentSearch = (query: string) => {
+    setContentSearchQuery(query);
+    
+    if (searchTimeout) {
+      clearTimeout(searchTimeout);
+    }
+    
+    if (query.trim().length >= 2) {
+      const timeout = setTimeout(() => {
+        searchContent(query);
+      }, 500);
+      setSearchTimeout(timeout);
+    } else {
+      setContentSearchResults([]);
+    }
+  };
+
+  const addContentToList = async (item: any) => {
+    if (!listDetail || !currentUser) return;
+    
+    try {
+      // Check if item already exists in the list
+      const existingItem = listItems.find(listItem => 
+        listItem.content_id === item.content_id && listItem.content_type === item.content_type
+      );
+      
+      if (existingItem) {
+        Alert.alert('Item Already Exists', 'This item is already in your list');
+        return;
+      }
+      
+      // Get the next position
+      const nextPosition = Math.max(...listItems.map(item => item.position), 0) + 1;
+      
+      // Insert new item
+      const { data: newItem, error } = await supabase
+        .from('list_items')
+        .insert({
+          list_id: listDetail.id,
+          external_id: item.content_id,
+          title: item.title,
+          subtitle: item.subtitle,
+          description: item.description,
+          image_url: item.image_url,
+          content_id: item.content_id,
+          content_type: item.content_type,
+          external_data: item.external_data,
+          position: nextPosition,
+          source: 'api'
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('Error adding item to list:', error);
+        Alert.alert('Error', 'Failed to add item to list');
+        return;
+      }
+      
+      // Update local state
+      setListItems([...listItems, newItem]);
+      setListDetail({
+        ...listDetail,
+        item_count: listDetail.item_count + 1
+      });
+      
+      // Close modal and reset search
+      setShowAddContentModal(false);
+      setContentSearchQuery('');
+      setContentSearchResults([]);
+      
+      Alert.alert('Success', 'Item added to your list!');
+      
+    } catch (error) {
+      console.error('Error adding content to list:', error);
+      Alert.alert('Error', 'Failed to add item to list');
     }
   };
 
@@ -612,6 +1265,12 @@ export default function ListDetailScreen() {
     <View style={styles.container}>
       <AppBar title="List Details" showBackButton />
       
+      {isOffline && (
+        <View style={styles.offlineIndicator}>
+          <Text style={styles.offlineText}>You're offline - showing cached data</Text>
+        </View>
+      )}
+      
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* List Header */}
         <View style={styles.listHeader}>
@@ -638,6 +1297,38 @@ export default function ListDetailScreen() {
               <Text style={styles.creatorUsername}>
                 @{listDetail.users_profiles?.username || 'unknown'}
               </Text>
+            </View>
+            
+            <View style={styles.headerActions}>
+              {!isListOwner && (
+                <TouchableOpacity 
+                  style={[styles.followButton, isFollowing && styles.followButtonActive]}
+                  onPress={handleFollowList}
+                  disabled={followLoading}
+                >
+                  {followLoading ? (
+                    <ActivityIndicator size="small" color={isFollowing ? "#FFFFFF" : "#F97316"} />
+                  ) : (
+                    <>
+                      {isFollowing ? (
+                        <Check size={16} color="#FFFFFF" />
+                      ) : (
+                        <Plus size={16} color="#F97316" />
+                      )}
+                      <Text style={[styles.followButtonText, isFollowing && styles.followButtonTextActive]}>
+                        {isFollowing ? 'Following' : 'Follow'}
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+              
+              <TouchableOpacity 
+                style={styles.optionsButton}
+                onPress={() => setShowOptionsMenu(true)}
+              >
+                <DotsThreeVertical size={20} color="#6B7280" />
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -680,6 +1371,30 @@ export default function ListDetailScreen() {
 
         {/* List Items */}
         <View style={styles.itemsSection}>
+          {reorderMode && isListOwner && (
+            <View style={styles.reorderHeader}>
+              <Text style={styles.reorderText}>Drag items to reorder</Text>
+              <TouchableOpacity 
+                style={styles.reorderDoneButton}
+                onPress={() => setReorderMode(false)}
+              >
+                <Text style={styles.reorderDoneText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          
+          {/* Add Content Button - Only for list owners */}
+          {isListOwner && !reorderMode && (
+            <View style={styles.addContentSection}>
+              <TouchableOpacity 
+                style={styles.addContentButton}
+                onPress={() => setShowAddContentModal(true)}
+              >
+                <Plus size={20} color="#F97316" />
+                <Text style={styles.addContentText}>Add Content</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           
           {listItems.length === 0 ? (
             <View style={styles.emptyState}>
@@ -687,30 +1402,93 @@ export default function ListDetailScreen() {
             </View>
           ) : (
             <View style={styles.itemsGrid}>
-              {listItems.map((item) => (
-                <TouchableOpacity 
-                  key={item.id} 
-                  style={styles.itemCard}
-                  onPress={() => {
-                    if (item.content_id && item.content_type) {
-                      router.push(`/details/${item.content_type}/${item.content_id}`);
-                    }
-                  }}
-                >
-                  {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={styles.itemImage} />
-                  ) : (
-                    <View style={styles.itemImagePlaceholder}>
-                      <Text style={styles.itemEmoji}>{getItemEmoji(item.content_type)}</Text>
+              {listItems.map((item, index) => (
+                <View key={item.id} style={styles.itemCard}>
+                  {reorderMode && isListOwner && (
+                    <View style={styles.itemControls}>
+                      <TouchableOpacity 
+                        style={styles.dragHandle}
+                        onLongPress={() => {
+                          // Simple reorder with buttons for now
+                          if (index > 0) {
+                            const updatedItems = moveItem(index, index - 1);
+                            saveItemOrder(updatedItems);
+                          }
+                        }}
+                      >
+                        <DotsSixVertical size={16} color="#6B7280" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.deleteItemButton}
+                        onPress={() => {
+                          Alert.alert(
+                            'Delete Item',
+                            'Are you sure you want to delete this item?',
+                            [
+                              { text: 'Cancel', style: 'cancel' },
+                              { text: 'Delete', style: 'destructive', onPress: () => deleteItem(item.id) }
+                            ]
+                          );
+                        }}
+                      >
+                        <Trash size={16} color="#EF4444" />
+                      </TouchableOpacity>
                     </View>
                   )}
                   
-                  <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+                  <TouchableOpacity 
+                    style={styles.itemContent}
+                    onPress={() => {
+                      if (!reorderMode && item.content_id && item.content_type) {
+                        router.push(`/details/${item.content_type}/${item.content_id}`);
+                      }
+                    }}
+                    disabled={reorderMode}
+                  >
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.itemImage} />
+                    ) : (
+                      <View style={styles.itemImagePlaceholder}>
+                        <Text style={styles.itemEmoji}>{getItemEmoji(item.content_type)}</Text>
+                      </View>
+                    )}
+                    
+                    <Text style={styles.itemTitle} numberOfLines={2}>{item.title}</Text>
+                    
+                    {item.subtitle && (
+                      <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                    )}
+                  </TouchableOpacity>
                   
-                  {item.subtitle && (
-                    <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                  {reorderMode && isListOwner && (
+                    <View style={styles.itemReorderButtons}>
+                      <TouchableOpacity 
+                        style={[styles.reorderButton, index === 0 && styles.reorderButtonDisabled]}
+                        onPress={() => {
+                          if (index > 0) {
+                            const updatedItems = moveItem(index, index - 1);
+                            saveItemOrder(updatedItems);
+                          }
+                        }}
+                        disabled={index === 0}
+                      >
+                        <Text style={styles.reorderButtonText}>↑</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={[styles.reorderButton, index === listItems.length - 1 && styles.reorderButtonDisabled]}
+                        onPress={() => {
+                          if (index < listItems.length - 1) {
+                            const updatedItems = moveItem(index, index + 1);
+                            saveItemOrder(updatedItems);
+                          }
+                        }}
+                        disabled={index === listItems.length - 1}
+                      >
+                        <Text style={styles.reorderButtonText}>↓</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
-                </TouchableOpacity>
+                </View>
               ))}
             </View>
           )}
@@ -741,7 +1519,7 @@ export default function ListDetailScreen() {
 
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => handleShare()}
+              onPress={() => handleShareWithStats()}
             >
               <ShareIcon size={20} color="#6B7280" />
               <Text style={styles.actionText}>{listDetail.shares_count}</Text>
@@ -844,6 +1622,282 @@ export default function ListDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Options Menu Modal */}
+      <Modal
+        visible={showOptionsMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowOptionsMenu(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          onPress={() => setShowOptionsMenu(false)}
+        >
+          <View style={styles.optionsMenu}>
+            {isListOwner && (
+              <>
+                <TouchableOpacity style={styles.optionItem} onPress={handleEditList}>
+                  <PencilSimple size={20} color="#374151" />
+                  <Text style={styles.optionText}>Edit List</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionItem} onPress={toggleReorderMode}>
+                  <ArrowsOutCardinal size={20} color="#374151" />
+                  <Text style={styles.optionText}>
+                    {reorderMode ? 'Exit Reorder Mode' : 'Reorder Items'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.optionItem} onPress={handleDeleteList}>
+                  <Trash size={20} color="#EF4444" />
+                  <Text style={[styles.optionText, styles.optionTextDanger]}>Delete List</Text>
+                </TouchableOpacity>
+                <View style={styles.optionDivider} />
+              </>
+            )}
+            <TouchableOpacity style={styles.optionItem} onPress={generateQRCode}>
+              <QrCode size={20} color="#374151" />
+              <Text style={styles.optionText}>QR Code</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.optionItem} onPress={() => handleShareWithStats()}>
+              <ShareOutline size={20} color="#374151" />
+              <Text style={styles.optionText}>Share List</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Edit List Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.editModal}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.editHeader}>
+            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+              <Text style={styles.editCancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.editTitle}>Edit List</Text>
+            <TouchableOpacity 
+              onPress={saveListChanges}
+              disabled={saving || !editTitle.trim()}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#F97316" />
+              ) : (
+                <Text style={[styles.editSaveButton, !editTitle.trim() && styles.editSaveButtonDisabled]}>
+                  Save
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.editContent}>
+            <View style={styles.editField}>
+              <Text style={styles.editLabel}>Title</Text>
+              <TextInput
+                style={styles.editInput}
+                value={editTitle}
+                onChangeText={setEditTitle}
+                placeholder="Enter list title"
+                maxLength={100}
+              />
+            </View>
+            
+            <View style={styles.editField}>
+              <Text style={styles.editLabel}>Description</Text>
+              <TextInput
+                style={[styles.editInput, styles.editTextArea]}
+                value={editDescription}
+                onChangeText={setEditDescription}
+                placeholder="Enter list description (optional)"
+                multiline
+                maxLength={500}
+              />
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowDeleteModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteModal}>
+            <Text style={styles.deleteTitle}>Delete List</Text>
+            <Text style={styles.deleteMessage}>
+              Are you sure you want to delete this list? This action cannot be undone.
+            </Text>
+            <View style={styles.deleteActions}>
+              <TouchableOpacity 
+                style={styles.deleteCancelButton}
+                onPress={() => setShowDeleteModal(false)}
+              >
+                <Text style={styles.deleteCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.deleteConfirmButton}
+                onPress={confirmDeleteList}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.deleteConfirmText}>Delete</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* QR Code Modal */}
+      <Modal
+        visible={showQRModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowQRModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.qrModal}>
+            <View style={styles.qrHeader}>
+              <Text style={styles.qrTitle}>QR Code</Text>
+              <TouchableOpacity onPress={() => setShowQRModal(false)}>
+                <X size={24} color="#1F2937" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.qrContent}>
+              <View style={styles.qrCodePlaceholder}>
+                <QrCode size={120} color="#F97316" />
+                <Text style={styles.qrCodeText}>QR Code for this list</Text>
+              </View>
+              <Text style={styles.qrUrl}>
+                https://connectlist.app/list/{listDetail?.id}
+              </Text>
+              <TouchableOpacity 
+                style={styles.qrShareButton}
+                onPress={() => {
+                  setShowQRModal(false);
+                  handleShareWithStats();
+                }}
+              >
+                <ShareOutline size={16} color="#FFFFFF" />
+                <Text style={styles.qrShareText}>Share QR Code</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Content Modal */}
+      <Modal
+        visible={showAddContentModal}
+        animationType="slide"
+        onRequestClose={() => setShowAddContentModal(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.addContentModal}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.addContentHeader}>
+            <TouchableOpacity onPress={() => setShowAddContentModal(false)}>
+              <Text style={styles.addContentCancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.addContentTitle}>Add Content</Text>
+            <View style={styles.addContentSpacer} />
+          </View>
+          
+          <View style={styles.addContentBody}>
+            <View style={styles.searchInputContainer}>
+              <MagnifyingGlass size={20} color="#6B7280" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={`Search ${listDetail?.categories?.display_name || listDetail?.category || 'content'}...`}
+                value={contentSearchQuery}
+                onChangeText={handleContentSearch}
+                returnKeyType="search"
+                autoFocus
+              />
+              {contentSearchQuery.length > 0 && (
+                <TouchableOpacity 
+                  onPress={() => {
+                    setContentSearchQuery('');
+                    setContentSearchResults([]);
+                  }}
+                  style={styles.clearButton}
+                >
+                  <X size={16} color="#6B7280" />
+                </TouchableOpacity>
+              )}
+            </View>
+            
+            {isSearchingContent && (
+              <View style={styles.searchLoadingContainer}>
+                <ActivityIndicator size="large" color="#F97316" />
+                <Text style={styles.searchLoadingText}>Searching...</Text>
+              </View>
+            )}
+            
+            <FlatList
+              data={contentSearchResults}
+              keyExtractor={(item) => item.id.toString()}
+              showsVerticalScrollIndicator={false}
+              style={styles.searchResults}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={styles.searchResultItem}
+                  onPress={() => addContentToList(item)}
+                >
+                  {item.image_url ? (
+                    <Image source={{ uri: item.image_url }} style={styles.searchResultImage} />
+                  ) : (
+                    <View style={styles.searchResultImagePlaceholder}>
+                      <Text style={styles.searchResultEmoji}>{getItemEmoji(item.content_type)}</Text>
+                    </View>
+                  )}
+                  <View style={styles.searchResultContent}>
+                    <Text style={styles.searchResultTitle} numberOfLines={2}>{item.title}</Text>
+                    {item.subtitle && (
+                      <Text style={styles.searchResultSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                    )}
+                    {item.description && (
+                      <Text style={styles.searchResultDescription} numberOfLines={2}>{item.description}</Text>
+                    )}
+                  </View>
+                  <Plus size={20} color="#F97316" />
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={() => {
+                if (!contentSearchQuery.trim()) {
+                  return (
+                    <View style={styles.searchEmptyState}>
+                      <MagnifyingGlass size={48} color="#D1D5DB" />
+                      <Text style={styles.searchEmptyText}>
+                        Search for {listDetail?.categories?.display_name?.toLowerCase() || listDetail?.category || 'content'} to add to your list
+                      </Text>
+                    </View>
+                  );
+                }
+                if (!isSearchingContent && contentSearchResults.length === 0) {
+                  return (
+                    <View style={styles.searchEmptyState}>
+                      <Text style={styles.searchEmptyText}>No results found</Text>
+                    </View>
+                  );
+                }
+                return null;
+              }}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       <BottomMenu activeTab="home" onTabPress={handleTabPress} />
     </View>
   );
@@ -854,6 +1908,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  offlineIndicator: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F59E0B',
+  },
+  offlineText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#92400E',
+    textAlign: 'center',
+  },
   scrollView: {
     flex: 1,
   },
@@ -863,7 +1930,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#6B7280',
     marginTop: 16,
@@ -874,7 +1941,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 18,
     color: '#6B7280',
   },
@@ -891,6 +1958,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  followButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#F97316',
+  },
+  followButtonActive: {
+    backgroundColor: '#F97316',
+  },
+  followButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#F97316',
+  },
+  followButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  optionsButton: {
+    padding: 8,
+  },
   creatorAvatar: {
     width: 48,
     height: 48,
@@ -901,7 +1997,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   creatorInitial: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 18,
     color: '#6B7280',
   },
@@ -909,13 +2005,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   creatorName: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#1F2937',
     marginBottom: 2,
   },
   creatorUsername: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#6B7280',
   },
@@ -924,13 +2020,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   listTitle: {
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     fontSize: 24,
     color: '#1F2937',
     marginBottom: 8,
   },
   listDescription: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#4B5563',
     lineHeight: 24,
@@ -952,7 +2048,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   categoryText: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 12,
     color: '#374151',
   },
@@ -962,7 +2058,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   privacyText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 12,
     color: '#6B7280',
   },
@@ -972,12 +2068,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#6B7280',
   },
   separator: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#6B7280',
   },
@@ -998,7 +2094,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   actionText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#6B7280',
   },
@@ -1011,7 +2107,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   sectionTitle: {
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     fontSize: 20,
     color: '#1F2937',
     marginBottom: 16,
@@ -1021,7 +2117,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyStateText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#9CA3AF',
   },
@@ -1034,6 +2130,82 @@ const styles = StyleSheet.create({
   itemCard: {
     width: itemWidth,
     marginBottom: 16,
+    position: 'relative',
+  },
+  itemContent: {
+    flex: 1,
+  },
+  itemControls: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    flexDirection: 'row',
+    gap: 4,
+    zIndex: 10,
+  },
+  dragHandle: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  deleteItemButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  itemReorderButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  reorderButton: {
+    backgroundColor: '#F3F4F6',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+  },
+  reorderButtonDisabled: {
+    backgroundColor: '#F9FAFB',
+    borderColor: '#E5E7EB',
+  },
+  reorderButtonText: {
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: 'bold',
+  },
+  reorderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+  },
+  reorderText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#92400E',
+  },
+  reorderDoneButton: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  reorderDoneText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#FFFFFF',
   },
   itemImage: {
     width: '100%',
@@ -1055,7 +2227,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   itemTitle: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 12,
     color: '#1F2937',
     textAlign: 'center',
@@ -1063,7 +2235,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   itemSubtitle: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 10,
     color: '#6B7280',
     textAlign: 'center',
@@ -1085,7 +2257,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   commentsTitle: {
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     fontSize: 18,
     color: '#1F2937',
   },
@@ -1108,7 +2280,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   commentAvatarText: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#6B7280',
   },
@@ -1121,18 +2293,18 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   commentUsername: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#1F2937',
     marginRight: 8,
   },
   commentTime: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 12,
     color: '#9CA3AF',
   },
   commentText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#374151',
     lineHeight: 20,
@@ -1144,7 +2316,7 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyCommentsText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#9CA3AF',
   },
@@ -1166,7 +2338,7 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     flex: 1,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#1F2937',
     maxHeight: 100,
@@ -1183,5 +2355,375 @@ const styles = StyleSheet.create({
   },
   commentSendButtonDisabled: {
     backgroundColor: '#D1D5DB',
+  },
+  
+  // Options Menu Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  optionsMenu: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 0,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+  },
+  optionText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#374151',
+  },
+  optionTextDanger: {
+    color: '#EF4444',
+  },
+  optionDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 8,
+  },
+  
+  // Edit Modal Styles
+  editModal: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'ios' ? 44 : 24,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  editCancelButton: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  editTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    color: '#1F2937',
+  },
+  editSaveButton: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#F97316',
+  },
+  editSaveButtonDisabled: {
+    color: '#D1D5DB',
+  },
+  editContent: {
+    flex: 1,
+    padding: 20,
+  },
+  editField: {
+    marginBottom: 24,
+  },
+  editLabel: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#374151',
+    marginBottom: 8,
+  },
+  editInput: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#1F2937',
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  editTextArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  
+  // Delete Modal Styles
+  deleteModal: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+  },
+  deleteTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  deleteMessage: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  deleteActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deleteCancelButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+  },
+  deleteCancelText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  deleteConfirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+  },
+  deleteConfirmText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  
+  // QR Code Modal Styles
+  qrModal: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    maxWidth: 400,
+    alignSelf: 'center',
+  },
+  qrHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  qrTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    color: '#1F2937',
+  },
+  qrContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  qrCodePlaceholder: {
+    width: 200,
+    height: 200,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  qrCodeText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  qrUrl: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  qrShareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F97316',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  qrShareText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#FFFFFF',
+  },
+  
+  // Add Content Section Styles
+  addContentSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  addContentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  addContentText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#F97316',
+    fontWeight: '500',
+  },
+  
+  // Add Content Modal Styles
+  addContentModal: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'ios' ? 44 : 24,
+  },
+  addContentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  addContentCancelButton: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  addContentTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  addContentSpacer: {
+    width: 60,
+  },
+  addContentBody: {
+    flex: 1,
+    padding: 20,
+  },
+  searchInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  clearButton: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  searchLoadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  searchLoadingText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 12,
+  },
+  searchResults: {
+    flex: 1,
+  },
+  searchResultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+    gap: 12,
+  },
+  searchResultImage: {
+    width: 60,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  searchResultImagePlaceholder: {
+    width: 60,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  searchResultEmoji: {
+    fontSize: 24,
+  },
+  searchResultContent: {
+    flex: 1,
+    gap: 4,
+  },
+  searchResultTitle: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  searchResultSubtitle: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  searchResultDescription: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#9CA3AF',
+    lineHeight: 16,
+  },
+  searchEmptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+  },
+  searchEmptyText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginTop: 16,
   },
 });

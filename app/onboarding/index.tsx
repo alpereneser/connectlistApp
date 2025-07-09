@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize: 16,
     color: '#6B7280',
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
   },
   scrollView: {
     flex: 1,
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontFamily: fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     textAlign: 'center',
     marginBottom: 16,
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 20,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FF6B35',
     textAlign: 'center',
     marginBottom: 24,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 24,
@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   },
   startText: {
     fontSize: 16,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
 });

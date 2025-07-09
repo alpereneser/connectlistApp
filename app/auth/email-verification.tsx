@@ -203,14 +203,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontFamily: fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     textAlign: 'center',
     marginBottom: 16,
   },
   subtitle: {
     fontSize: 16,
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
     textAlign: 'center',
     marginBottom: 12,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 20,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
   secondaryButton: {
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 16,
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
   },
   disabledButtonText: {
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   helpText: {
     fontSize: 12,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#9CA3AF',
     textAlign: 'center',
     lineHeight: 16,
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#FF6B35',
   },
 });

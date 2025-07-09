@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, Linking, Share, Platform } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, Linking, Share, Platform, Modal, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import AppBar from '../components/AppBar';
@@ -19,6 +19,10 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
   const [activeCategory, setActiveCategory] = useState('All Lists');
   const [userLists, setUserLists] = useState<any[]>([]);
   const [listItems, setListItems] = useState<Record<string, any[]>>({});
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [showFollowingModal, setShowFollowingModal] = useState(false);
   const router = useRouter();
 
 
@@ -26,6 +30,82 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
   useEffect(() => {
     fetchUserProfile();
   }, []);
+
+  const fetchFollowers = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_follows')
+        .select(`
+          follower_id,
+          created_at,
+          follower:users_profiles!follower_id (
+            id,
+            username,
+            full_name,
+            avatar_url,
+            bio
+          )
+        `)
+        .eq('following_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching followers:', error);
+        return [];
+      }
+
+      return data?.map(follow => follow.follower) || [];
+    } catch (error) {
+      console.error('Error in fetchFollowers:', error);
+      return [];
+    }
+  };
+
+  const fetchFollowing = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_follows')
+        .select(`
+          following_id,
+          created_at,
+          following:users_profiles!following_id (
+            id,
+            username,
+            full_name,
+            avatar_url,
+            bio
+          )
+        `)
+        .eq('follower_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching following:', error);
+        return [];
+      }
+
+      return data?.map(follow => follow.following) || [];
+    } catch (error) {
+      console.error('Error in fetchFollowing:', error);
+      return [];
+    }
+  };
+
+  const handleShowFollowers = async () => {
+    if (user?.id) {
+      const followersData = await fetchFollowers(user.id);
+      setFollowers(followersData);
+      setShowFollowersModal(true);
+    }
+  };
+
+  const handleShowFollowing = async () => {
+    if (user?.id) {
+      const followingData = await fetchFollowing(user.id);
+      setFollowing(followingData);
+      setShowFollowingModal(true);
+    }
+  };
 
   const fetchUserProfile = async () => {
     try {
@@ -339,23 +419,43 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
     return userLists.filter(list => list.category === categoryFilter);
   }, [userLists, activeCategory]);
 
+  // Helper function to get category display name
+  const getCategoryDisplayName = (category: string) => {
+    switch (category) {
+      case 'movies':
+        return 'Movies';
+      case 'tv_shows':
+        return 'TV Shows';
+      case 'books':
+        return 'Books';
+      case 'games':
+        return 'Games';
+      case 'places':
+        return 'Places';
+      case 'persons':
+        return 'People';
+      default:
+        return 'General';
+    }
+  };
+
   // Helper function to get category icon
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'movies':
-        return <FilmStrip size={12} color="#666" />;
+        return <FilmStrip size={16} color="#666" />;
       case 'tv_shows':
-        return <Television size={12} color="#666" />;
+        return <Television size={16} color="#666" />;
       case 'books':
-        return <Book size={12} color="#666" />;
+        return <Book size={16} color="#666" />;
       case 'games':
-        return <GameController size={12} color="#666" />;
+        return <GameController size={16} color="#666" />;
       case 'places':
-        return <MapTrifold size={12} color="#666" />;
+        return <MapTrifold size={16} color="#666" />;
       case 'persons':
-        return <UserCircle size={12} color="#666" />;
+        return <UserCircle size={16} color="#666" />;
       default:
-        return <List size={12} color="#666" />;
+        return <List size={16} color="#666" />;
     }
   };
 
@@ -445,9 +545,19 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
                     <View style={[styles.followerAvatar, styles.followerAvatar1]} />
                     <View style={[styles.followerAvatar, styles.followerAvatar2]} />
                   </View>
-                  <Text style={styles.followersText}>
-                    {user?.followers_count || 0} followers • {user?.following_count || 0} following
-                  </Text>
+                  <View style={styles.followersTextContainer}>
+                    <TouchableOpacity onPress={handleShowFollowers}>
+                      <Text style={styles.followersText}>
+                        {user?.followers_count || 0} followers
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={styles.followersText}> • </Text>
+                    <TouchableOpacity onPress={handleShowFollowing}>
+                      <Text style={styles.followersText}>
+                        {user?.following_count || 0} following
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
               <View style={styles.avatarContainer}>
@@ -538,7 +648,7 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
                           <View style={styles.categoryTag}>
                             {getCategoryIcon(list.categories?.name || list.category)}
                             <Text style={styles.listCategory}>
-                              {list.categories?.display_name || list.category || 'General'}
+                              {list.categories?.display_name || getCategoryDisplayName(list.category)}
                             </Text>
                           </View>
                           <Text style={styles.separator}>•</Text>
@@ -596,15 +706,15 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
                   {/* List Stats */}
                   <View style={styles.listStatsRow}>
                     <TouchableOpacity style={styles.statButton}>
-                      <Heart size={16} color="#6B7280" />
+                      <Heart size={21} color="#6B7280" />
                       <Text style={styles.statText}>{list.likes_count || 0}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.statButton}>
-                      <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
+                      <Ionicons name="chatbubble-outline" size={21} color="#6B7280" />
                       <Text style={styles.statText}>{list.comments_count || 0}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.statButton}>
-                      <Ionicons name="share-outline" size={16} color="#6B7280" />
+                      <Ionicons name="share-outline" size={21} color="#6B7280" />
                       <Text style={styles.statText}>{list.shares_count || 0}</Text>
                     </TouchableOpacity>
                   </View>
@@ -622,6 +732,137 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
           </View>
         </ScrollView>
       </View>
+
+      {/* Followers Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showFollowersModal}
+        onRequestClose={() => setShowFollowersModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Followers</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowFollowersModal(false)}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={followers}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={styles.userItem}
+                  onPress={() => {
+                    setShowFollowersModal(false);
+                    // Navigate to user profile if needed
+                  }}
+                >
+                  {item.avatar_url ? (
+                    <Image source={{ uri: item.avatar_url }} style={styles.userAvatar} />
+                  ) : (
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>
+                        {item.full_name?.charAt(0) || item.username?.charAt(0) || '?'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.userInfo}>
+                    <Text style={styles.userFullName}>
+                      {item.full_name || item.username}
+                    </Text>
+                    <Text style={styles.userUsername}>@{item.username}</Text>
+                    {item.bio && (
+                      <Text style={styles.userBio} numberOfLines={2}>
+                        {item.bio}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.modalEmptyState}>
+                  <Text style={styles.modalEmptyIcon}>👥</Text>
+                  <Text style={styles.modalEmptyTitle}>No followers yet</Text>
+                  <Text style={styles.modalEmptySubtitle}>
+                    When people follow you, they'll appear here
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
+
+      {/* Following Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showFollowingModal}
+        onRequestClose={() => setShowFollowingModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Following</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setShowFollowingModal(false)}
+              >
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={following}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity 
+                  style={styles.userItem}
+                  onPress={() => {
+                    setShowFollowingModal(false);
+                    // Navigate to user profile if needed
+                  }}
+                >
+                  {item.avatar_url ? (
+                    <Image source={{ uri: item.avatar_url }} style={styles.userAvatar} />
+                  ) : (
+                    <View style={styles.userAvatar}>
+                      <Text style={styles.userAvatarText}>
+                        {item.full_name?.charAt(0) || item.username?.charAt(0) || '?'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.userInfo}>
+                    <Text style={styles.userFullName}>
+                      {item.full_name || item.username}
+                    </Text>
+                    <Text style={styles.userUsername}>@{item.username}</Text>
+                    {item.bio && (
+                      <Text style={styles.userBio} numberOfLines={2}>
+                        {item.bio}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <View style={styles.modalEmptyState}>
+                  <Text style={styles.modalEmptyIcon}>🔍</Text>
+                  <Text style={styles.modalEmptyTitle}>Not following anyone yet</Text>
+                  <Text style={styles.modalEmptySubtitle}>
+                    Discover and follow people to see them here
+                  </Text>
+                </View>
+              }
+            />
+          </View>
+        </View>
+      </Modal>
+
       <BottomMenu activeTab="profile" onTabPress={handleTabPress} />
     </View>
   );
@@ -649,7 +890,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   userName: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 24,
     color: '#000000',
     lineHeight: 22,
@@ -660,7 +901,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   usernameText: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#000000',
     lineHeight: 19,
@@ -672,7 +913,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
   },
   threadsText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 10,
     color: '#A0A0A0',
     lineHeight: 12,
@@ -692,7 +933,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     fontSize: 24,
     color: '#6B7280',
   },
@@ -702,13 +943,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   joinDateText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 12,
     color: '#9CA3AF',
     marginLeft: 4,
   },
   bio: {
-    ...fontConfig.light,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#000000',
     lineHeight: 19,
@@ -726,7 +967,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   detailText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#6B7280',
   },
@@ -737,6 +978,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  followersTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   followersAvatars: {
     flexDirection: 'row',
@@ -761,7 +1006,7 @@ const styles = StyleSheet.create({
     left: 9.33,
   },
   followersText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#B8B8B8',
     lineHeight: 19,
@@ -778,7 +1023,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   editButtonText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#000000',
     lineHeight: 19,
@@ -792,7 +1037,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   shareButtonText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#000000',
     lineHeight: 19,
@@ -806,7 +1051,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    ...fontConfig.semibold,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#1F2937',
     marginBottom: 16,
@@ -834,13 +1079,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   activityTitle: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#1F2937',
     marginBottom: 2,
   },
   activityTime: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 12,
     color: '#9CA3AF',
   },
@@ -851,13 +1096,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   appInfoText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 12,
     color: '#9CA3AF',
     marginBottom: 4,
   },
   loadingText: {
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     fontSize: 16,
     color: '#6B7280',
     textAlign: 'center',
@@ -884,7 +1129,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F97316',
   },
   categoryText: {
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     fontSize: 14,
     color: '#6B7280',
   },
@@ -893,32 +1138,32 @@ const styles = StyleSheet.create({
   },
   // List Preview Styles
   listPreviewContainer: {
-    marginBottom: 24,
+    marginBottom: 28,
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 2,
+    padding: 19,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#F3F4F6',
   },
   listHeader: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   listHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   listAuthorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 47,
+    height: 47,
+    borderRadius: 24,
     backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
   listAuthorInitial: {
-    ...fontConfig.medium,
-    fontSize: 16,
+    fontFamily: 'Inter',
+    fontSize: 19,
     color: '#6B7280',
   },
   listInfo: {
@@ -928,133 +1173,135 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
+    gap: 5,
+    marginBottom: 5,
   },
   listAuthorName: {
-    ...fontConfig.medium,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: 16,
     color: '#000000',
   },
   listAction: {
-    ...fontConfig.regular,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: 16,
     color: '#6B7280',
   },
   listTitle: {
-    ...fontConfig.medium,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: 16,
     color: '#F97316',
   },
   listMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   listUsername: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: 14,
     color: '#6B7280',
   },
   separator: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: 14,
     color: '#6B7280',
   },
   categoryTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   listCategory: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: 14,
     color: '#6B7280',
   },
   listItemCount: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: 14,
     color: '#6B7280',
   },
   listDescriptionText: {
-    ...fontConfig.regular,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: 16,
     color: '#6B7280',
-    marginBottom: 12,
-    lineHeight: 20,
+    marginBottom: 14,
+    lineHeight: 23,
   },
   divider: {
     height: 1,
     backgroundColor: '#E5E7EB',
-    marginVertical: 12,
+    marginVertical: 14,
   },
   itemsScrollView: {
-    marginHorizontal: -16,
-    paddingHorizontal: 16,
+    marginHorizontal: -19,
+    paddingHorizontal: 19,
   },
   listItemsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    paddingRight: 16,
+    gap: 14,
+    paddingRight: 19,
   },
   listItemCard: {
-    width: 100,
+    width: 117,
     alignItems: 'center',
   },
   itemImage: {
-    width: 100,
-    height: 140,
+    width: 117,
+    height: 164,
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    marginBottom: 8,
+    borderRadius: 9,
+    marginBottom: 9,
   },
   itemImagePlaceholder: {
-    width: 100,
-    height: 140,
+    width: 117,
+    height: 164,
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 9,
   },
   itemEmoji: {
-    fontSize: 32,
+    fontSize: 38,
   },
   itemTitle: {
-    ...fontConfig.medium,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: 14,
     color: '#1F2937',
     textAlign: 'center',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   itemSubtitle: {
-    ...fontConfig.regular,
-    fontSize: 10,
+    fontFamily: 'Inter',
+    fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
   },
   noItemsContainer: {
-    paddingVertical: 20,
+    paddingVertical: 23,
     alignItems: 'center',
   },
   noItemsText: {
-    ...fontConfig.regular,
-    fontSize: 14,
+    fontFamily: 'Inter',
+    fontSize: 16,
     color: '#9CA3AF',
   },
   listStatsRow: {
     flexDirection: 'row',
-    gap: 24,
-    marginTop: 12,
-    paddingTop: 12,
+    gap: 7,
+    marginTop: 14,
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
   statButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
   },
   listCoverImage: {
     width: 40,
@@ -1073,8 +1320,110 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statText: {
-    ...fontConfig.regular,
-    fontSize: 12,
+    fontFamily: 'Inter',
+    fontSize: 18,
     color: '#6B7280',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    color: '#1F2937',
+  },
+  modalCloseButton: {
+    padding: 8,
+  },
+  modalCloseText: {
+    fontSize: 18,
+    color: '#6B7280',
+  },
+  userItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F9FAFB',
+  },
+  userAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  userAvatarText: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    color: '#6B7280',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userFullName: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  userUsername: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  userBio: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#9CA3AF',
+    lineHeight: 16,
+  },
+  modalEmptyState: {
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalEmptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  modalEmptyTitle: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    color: '#1F2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalEmptySubtitle: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 280,
   },
 });

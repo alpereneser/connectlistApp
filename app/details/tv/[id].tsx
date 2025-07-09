@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginTop: 16,
   },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 18,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   imageContainer: {
@@ -385,13 +385,13 @@ const styles = StyleSheet.create({
   },
   tvShowTitle: {
     fontSize: 24,
-    ...fontConfig.bold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 4,
   },
   originalTitle: {
     fontSize: 16,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginBottom: 8,
   },
@@ -402,13 +402,13 @@ const styles = StyleSheet.create({
   },
   ratingText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginLeft: 4,
   },
   voteCount: {
     fontSize: 14,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#6B7280',
     marginLeft: 4,
   },
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   actionButtons: {
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#FFFFFF',
   },
   secondaryButton: {
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 16,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#3B82F6',
   },
   section: {
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
     marginBottom: 12,
   },
@@ -486,12 +486,12 @@ const styles = StyleSheet.create({
   },
   genreText: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#374151',
   },
   overview: {
     fontSize: 16,
-    ...fontConfig.regular,
+    fontFamily: 'Inter',
     color: '#374151',
     lineHeight: 24,
   },
@@ -505,12 +505,12 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 14,
-    ...fontConfig.medium,
+    fontFamily: 'Inter',
     color: '#6B7280',
   },
   detailValue: {
     fontSize: 14,
-    ...fontConfig.semiBold,
+    fontFamily: 'Inter',
     color: '#1F2937',
   },
 });

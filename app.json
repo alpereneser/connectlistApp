@@ -1,30 +1,66 @@
 {
   "expo": {
-    "name": "connectlist-expo",
-    "slug": "connectlist-expo",
+    "name": "ConnectList",
+    "slug": "connectlist",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "connectlistexpo",
+    "scheme": "connectlist",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "description": "Discover, create and share curated lists of movies, TV shows, books, games, and places. Connect with others who share your interests and discover new content through personalized recommendations.",
+    "primaryColor": "#F97316",
+    "backgroundColor": "#FFFFFF",
+    "privacy": "public",
+    "owner": "connectlist",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.connectlist.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ConnectList uses the camera to take photos for your profile picture and list content.",
+        "NSPhotoLibraryUsageDescription": "ConnectList accesses your photo library to select images for your profile and lists.",
+        "NSFaceIDUsageDescription": "ConnectList uses Face ID for secure authentication."
+      },
+      "associatedDomains": ["applinks:connectlist.me"]
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.connectlist.app",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "connectlist.me"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "css": ["./styles/fonts.css"]
     },
     "fonts": [
-      "https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap"
+      "https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800;900&display=swap"
     ],
     "plugins": [
       "expo-router",

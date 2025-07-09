@@ -196,14 +196,14 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 28,
-    fontFamily: fontConfig.bold,
+    fontFamily: 'Inter',
     fontWeight: '700',
     color: '#1F2937',
     marginBottom: 8,
   },
   subtitleText: {
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     fontWeight: '400',
     color: '#6B7280',
   },
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 16,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     fontWeight: '400',
     color: '#1F2937',
   },
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 14,
-    fontFamily: fontConfig.medium,
+    fontFamily: 'Inter',
     fontWeight: '500',
     color: '#FF6B35',
   },
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   loginButtonText: {
     fontSize: 16,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -269,13 +269,13 @@ const styles = StyleSheet.create({
   },
   registerText: {
     fontSize: 14,
-    fontFamily: fontConfig.regular,
+    fontFamily: 'Inter',
     fontWeight: '400',
     color: '#6B7280',
   },
   registerLink: {
     fontSize: 14,
-    fontFamily: fontConfig.semiBold,
+    fontFamily: 'Inter',
     fontWeight: '600',
     color: '#FF6B35',
   },
