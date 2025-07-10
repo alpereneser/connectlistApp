@@ -105,6 +105,7 @@ interface Comment {
   content: string;
   user_id: string;
   list_id: string;
+  parent_id?: string;
   created_at: string;
   updated_at: string;
   users_profiles?: {
@@ -113,6 +114,7 @@ interface Comment {
     full_name: string;
     avatar_url?: string;
   };
+  replies?: Comment[];
 }
 
 export default function ListDetailScreen() {
@@ -131,6 +133,9 @@ export default function ListDetailScreen() {
   const [newComment, setNewComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
   const [postingComment, setPostingComment] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [deletingComment, setDeletingComment] = useState<string | null>(null);
   
   // Edit list modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -159,6 +164,8 @@ export default function ListDetailScreen() {
   const [contentSearchResults, setContentSearchResults] = useState<any[]>([]);
   const [isSearchingContent, setIsSearchingContent] = useState(false);
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
+  const [isAddingItems, setIsAddingItems] = useState(false);
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState(new Animated.Value(0));
   
@@ -198,24 +205,28 @@ export default function ListDetailScreen() {
       
       if (user && id) {
         // Check if user liked this list
-        const { data: listLike } = await supabase
+        const { data: listLike, error: likeError } = await supabase
           .from('list_likes')
           .select('id')
           .eq('list_id', id)
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
-        setIsLiked(!!listLike);
+        if (!likeError) {
+          setIsLiked(!!listLike);
+        }
         
         // Check if user is following this list
-        const { data: followData } = await supabase
+        const { data: followData, error: followError } = await supabase
           .from('list_follows')
           .select('id')
           .eq('list_id', id)
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
         
-        setIsFollowing(!!followData);
+        if (!followError) {
+          setIsFollowing(!!followData);
+        }
       }
     } catch (error) {
       console.error('Error fetching current user:', error);
@@ -247,10 +258,14 @@ export default function ListDetailScreen() {
         return;
       }
       
-      // Fetch list details
+      // Fetch list details with category join
       const { data: listData, error: listError } = await supabase
         .from('lists')
-        .select('*')
+        .select(`
+          *,
+          users_profiles:creator_id(id, username, full_name, avatar_url),
+          categories:category_id(name, display_name)
+        `)
         .eq('id', id)
         .single();
 
@@ -269,24 +284,10 @@ export default function ListDetailScreen() {
       }
 
       if (listData) {
-        // Fetch creator profile
-        const { data: profileData } = await supabase
-          .from('users_profiles')
-          .select('id, username, full_name, avatar_url')
-          .eq('id', listData.creator_id)
-          .single();
-
-        // Fetch category data
-        const { data: categoryData } = await supabase
-          .from('categories')
-          .select('name, display_name')
-          .eq('name', listData.category)
-          .single();
-
+        // Add category name to the main object for easier access
         const enrichedList: ListDetail = {
           ...listData,
-          users_profiles: profileData || null,
-          categories: categoryData || null,
+          category: listData.categories?.name || null,
         };
 
         setListDetail(enrichedList);
@@ -366,11 +367,17 @@ export default function ListDetailScreen() {
     try {
       if (isLiked) {
         // Unlike list
-        await supabase
+        const { error } = await supabase
           .from('list_likes')
           .delete()
           .eq('list_id', listDetail.id)
           .eq('user_id', currentUser.id);
+
+        if (error) {
+          console.error('Error unliking list:', error);
+          Alert.alert('Error', 'Failed to unlike list');
+          return;
+        }
 
         setIsLiked(false);
         setListDetail({
@@ -379,12 +386,18 @@ export default function ListDetailScreen() {
         });
       } else {
         // Like list
-        await supabase
+        const { error } = await supabase
           .from('list_likes')
           .insert({
             list_id: listDetail.id,
             user_id: currentUser.id
           });
+
+        if (error) {
+          console.error('Error liking list:', error);
+          Alert.alert('Error', 'Failed to like list');
+          return;
+        }
 
         setIsLiked(true);
         setListDetail({
@@ -519,8 +532,15 @@ export default function ListDetailScreen() {
           users_profiles: usersMap[comment.user_id] || null
         }));
 
-        console.log('Enriched comments:', enrichedComments);
-        setComments(enrichedComments);
+        // Organize comments into threads (parent comments with replies)
+        const parentComments = enrichedComments.filter(comment => !comment.parent_id);
+        const commentThreads = parentComments.map(parent => ({
+          ...parent,
+          replies: enrichedComments.filter(comment => comment.parent_id === parent.id)
+        }));
+
+        console.log('Enriched comments with threads:', commentThreads);
+        setComments(commentThreads);
       } else {
         setComments([]);
       }
@@ -540,35 +560,25 @@ export default function ListDetailScreen() {
     fetchComments();
   };
 
-  const postComment = async () => {
-    if (!newComment.trim() || !currentUser || !listDetail) {
+  const postComment = async (parentId?: string) => {
+    const commentText = parentId ? replyText : newComment;
+    if (!commentText.trim() || !currentUser || !listDetail) {
       return;
     }
 
     try {
       setPostingComment(true);
       
-      // Simple comment insert - Instagram style
+      // Insert comment first
       const { data: commentData, error } = await supabase
         .from('list_comments')
         .insert({
-          content: newComment.trim(),
+          content: commentText.trim(),
           user_id: currentUser.id,
-          list_id: listDetail.id
+          list_id: listDetail.id,
+          parent_id: parentId || null
         })
-        .select(`
-          id,
-          content,
-          created_at,
-          user_id,
-          list_id,
-          users_profiles:user_id (
-            id,
-            username,
-            full_name,
-            avatar_url
-          )
-        `)
+        .select('*')
         .single();
 
       if (error) {
@@ -577,11 +587,35 @@ export default function ListDetailScreen() {
         return;
       }
 
-      // Add new comment to UI immediately
-      setComments(prev => [...prev, commentData]);
-      setNewComment('');
+      // Get user profile separately
+      const { data: userProfile } = await supabase
+        .from('users_profiles')
+        .select('id, username, full_name, avatar_url')
+        .eq('id', currentUser.id)
+        .single();
+
+      // Create enriched comment object
+      const enrichedComment = {
+        ...commentData,
+        users_profiles: userProfile
+      };
+
+      if (parentId) {
+        // If replying, add to the parent comment's replies
+        setComments(prev => prev.map(comment => 
+          comment.id === parentId
+            ? { ...comment, replies: [...(comment.replies || []), enrichedComment] }
+            : comment
+        ));
+        setReplyText('');
+        setReplyingTo(null);
+      } else {
+        // If new comment, add to the main comments list
+        setComments(prev => [...prev, { ...enrichedComment, replies: [] }]);
+        setNewComment('');
+      }
       
-      // Update comments count manually (trigger will also update DB)
+      // Update comments count manually
       setListDetail({
         ...listDetail,
         comments_count: listDetail.comments_count + 1
@@ -592,6 +626,52 @@ export default function ListDetailScreen() {
       Alert.alert('Error', 'Failed to post comment');
     } finally {
       setPostingComment(false);
+    }
+  };
+
+  const deleteComment = async (commentId: string, parentId?: string) => {
+    if (!currentUser) return;
+
+    try {
+      setDeletingComment(commentId);
+      
+      const { error } = await supabase
+        .from('list_comments')
+        .delete()
+        .eq('id', commentId)
+        .eq('user_id', currentUser.id); // Only allow users to delete their own comments
+
+      if (error) {
+        console.error('Error deleting comment:', error);
+        Alert.alert('Error', 'Failed to delete comment');
+        return;
+      }
+
+      // Remove comment from UI
+      if (parentId) {
+        // Remove reply from parent comment
+        setComments(prev => prev.map(comment => 
+          comment.id === parentId
+            ? { ...comment, replies: comment.replies?.filter(reply => reply.id !== commentId) || [] }
+            : comment
+        ));
+      } else {
+        // Remove main comment and all its replies
+        setComments(prev => prev.filter(comment => comment.id !== commentId));
+      }
+
+      // Update comments count manually
+      if (listDetail) {
+        setListDetail({
+          ...listDetail,
+          comments_count: Math.max((listDetail.comments_count || 0) - 1, 0)
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      Alert.alert('Error', 'Failed to delete comment');
+    } finally {
+      setDeletingComment(null);
     }
   };
 
@@ -961,12 +1041,15 @@ export default function ListDetailScreen() {
       let results: any[] = [];
       
       const category = listDetail.category;
+      console.log('Searching for:', query, 'in category:', category);
+      console.log('Category from join:', listDetail.categories?.name);
+      console.log('Category fallback:', listDetail.category);
       
       // Search based on list category
       switch (category) {
         case 'movies':
           const movieResults = await searchMulti(query, 1);
-          results = movieResults.filter((item: any) => item.media_type === 'movie').map((movie: MovieResult) => ({
+          results = movieResults.movies.map((movie: MovieResult) => ({
             id: movie.id,
             content_id: movie.id.toString(),
             content_type: 'movie',
@@ -981,7 +1064,7 @@ export default function ListDetailScreen() {
           
         case 'tv_shows':
           const tvResults = await searchMulti(query, 1);
-          results = tvResults.filter((item: any) => item.media_type === 'tv').map((tv: TVShowResult) => ({
+          results = tvResults.tvShows.map((tv: TVShowResult) => ({
             id: tv.id,
             content_id: tv.id.toString(),
             content_type: 'tv',
@@ -995,8 +1078,9 @@ export default function ListDetailScreen() {
           break;
           
         case 'books':
-          const bookResults = await searchBooks(query);
-          results = bookResults.map((book: BookResult) => ({
+          const bookResponse = await searchBooks(query);
+          console.log('Book search response:', bookResponse.totalItems, 'books found');
+          results = (bookResponse.items || []).map((book: BookResult) => ({
             id: book.id,
             content_id: book.id,
             content_type: 'book',
@@ -1011,37 +1095,41 @@ export default function ListDetailScreen() {
           
         case 'games':
           const gameResults = await searchGames(query);
-          results = gameResults.map((game: GameResult) => ({
+          console.log('Game search results:', gameResults.count, 'games found');
+          console.log('Raw game results:', JSON.stringify(gameResults, null, 2));
+          results = gameResults.results.map((game: GameResult) => ({
             id: game.id,
             content_id: game.id.toString(),
             content_type: 'game',
             type: 'game',
             title: game.name,
             subtitle: game.released || '',
-            description: game.description_raw || '',
-            image_url: getGameImageUrl(game),
+            description: '', // GameResult doesn't have description_raw field
+            image_url: getGameImageUrl(game.background_image),
             external_data: game
           }));
+          console.log('Processed game results:', results.length, 'games processed');
           break;
           
         case 'places':
-          const placeResults = await searchPlaces(query);
-          results = placeResults.map((place: PlaceResult) => ({
-            id: place.properties?.CompanyMetaData?.id || Math.random().toString(),
-            content_id: place.properties?.CompanyMetaData?.id || Math.random().toString(),
+          const placeResponse = await searchPlaces(query);
+          console.log('Place search response:', placeResponse.total, 'places found');
+          results = (placeResponse.results || []).map((place: PlaceResult) => ({
+            id: place.id,
+            content_id: place.id,
             content_type: 'place',
             type: 'place',
-            title: place.properties?.name || place.properties?.description || '',
-            subtitle: place.properties?.CompanyMetaData?.address || '',
-            description: place.properties?.description || '',
-            image_url: undefined,
+            title: place.name,
+            subtitle: place.address,
+            description: place.description || '',
+            image_url: place.image,
             external_data: place
           }));
           break;
           
-        case 'persons':
+        case 'person':
           const personResults = await searchMulti(query, 1);
-          results = personResults.filter((item: any) => item.media_type === 'person').map((person: PersonResult) => ({
+          results = personResults.people.map((person: PersonResult) => ({
             id: person.id,
             content_id: person.id.toString(),
             content_type: 'person',
@@ -1054,10 +1142,56 @@ export default function ListDetailScreen() {
           }));
           break;
           
+        case 'videos':
+          // Parse YouTube URL and extract video info
+          const videoId = extractYouTubeVideoId(query);
+          if (videoId) {
+            try {
+              // Create a video result from the URL
+              const videoResult = {
+                id: videoId,
+                content_id: videoId,
+                content_type: 'video',
+                type: 'video',
+                title: 'YouTube Video',
+                subtitle: 'Click to add this video',
+                description: query,
+                image_url: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+                external_data: {
+                  videoId,
+                  url: query,
+                  platform: 'youtube'
+                }
+              };
+              results = [videoResult];
+            } catch (error) {
+              console.error('Error processing YouTube URL:', error);
+              results = [];
+            }
+          } else {
+            results = [];
+          }
+          break;
+          
         default:
+          console.log('DEFAULT CASE! Category not recognized:', category);
           // For general category, search all types
           const allResults = await searchMulti(query, 1);
-          results = allResults.map((item: any) => {
+          const allMovieResults = allResults.movies.map((item: any) => ({
+            ...item,
+            media_type: 'movie'
+          }));
+          const allTvResults = allResults.tvShows.map((item: any) => ({
+            ...item,
+            media_type: 'tv'
+          }));
+          const allPersonResults = allResults.people.map((item: any) => ({
+            ...item,
+            media_type: 'person'
+          }));
+          
+          const allItems = [...allMovieResults, ...allTvResults, ...allPersonResults];
+          results = allItems.map((item: any) => {
             if (item.media_type === 'movie') {
               return {
                 id: item.id,
@@ -1099,12 +1233,115 @@ export default function ListDetailScreen() {
           }).filter(Boolean);
       }
       
+      console.log('Final results to display:', results.length, 'items');
       setContentSearchResults(results);
     } catch (error) {
       console.error('Error searching content:', error);
       Alert.alert('Error', 'Failed to search content');
     } finally {
       setIsSearchingContent(false);
+    }
+  };
+
+  // YouTube URL extraction helper
+  const extractYouTubeVideoId = (url: string): string | null => {
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /(?:youtube\.com\/v\/)([^&\n?#]+)/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
+    return null;
+  };
+
+  const closeAddContentModal = () => {
+    setShowAddContentModal(false);
+    setContentSearchQuery('');
+    setContentSearchResults([]);
+    setSelectedItems([]);
+  };
+
+  const toggleItemSelection = (item: any) => {
+    setSelectedItems(prev => {
+      const isSelected = prev.find(selected => selected.id === item.id);
+      if (isSelected) {
+        // Remove from selection
+        return prev.filter(selected => selected.id !== item.id);
+      } else {
+        // Add to selection
+        return [...prev, item];
+      }
+    });
+  };
+
+  const isItemSelected = (itemId: string) => {
+    return selectedItems.some(item => item.id === itemId);
+  };
+
+  const handleFinishSelection = async () => {
+    if (!listDetail || !currentUser || selectedItems.length === 0) return;
+
+    setIsAddingItems(true);
+    try {
+      // Get the highest position in the current list
+      const maxPosition = Math.max(...listItems.map(item => item.position), 0);
+      
+      // Prepare items for batch insert
+      const itemsToInsert = selectedItems.map((item, index) => ({
+        list_id: listDetail.id,
+        external_id: item.content_id,
+        title: item.title,
+        description: item.description,
+        subtitle: item.subtitle,
+        image_url: item.image_url,
+        external_data: item.external_data,
+        content_id: item.content_id,
+        content_type: item.content_type,
+        position: maxPosition + index + 1,
+        source: 'search'
+      }));
+
+      // Insert all items at once
+      const { data: insertedItems, error } = await supabase
+        .from('list_items')
+        .insert(itemsToInsert)
+        .select();
+
+      if (error) throw error;
+
+      // Update local state
+      setListItems(prev => [...prev, ...insertedItems]);
+      
+      // Update list item count
+      const { error: updateError } = await supabase
+        .from('lists')
+        .update({ 
+          item_count: listDetail.item_count + selectedItems.length,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', listDetail.id);
+
+      if (updateError) throw updateError;
+
+      // Update local list detail
+      setListDetail(prev => prev && {
+        ...prev,
+        item_count: prev.item_count + selectedItems.length
+      });
+      
+      closeAddContentModal();
+      Alert.alert('Success', `${selectedItems.length} items added to your list!`);
+      
+    } catch (error) {
+      console.error('Error adding items:', error);
+      Alert.alert('Error', 'Failed to add items to list');
+    } finally {
+      setIsAddingItems(false);
     }
   };
 
@@ -1115,77 +1352,27 @@ export default function ListDetailScreen() {
       clearTimeout(searchTimeout);
     }
     
-    if (query.trim().length >= 2) {
-      const timeout = setTimeout(() => {
+    if (listDetail?.category === 'videos') {
+      // For videos, parse immediately
+      if (query.trim().length > 0) {
         searchContent(query);
-      }, 500);
-      setSearchTimeout(timeout);
+      } else {
+        setContentSearchResults([]);
+      }
     } else {
-      setContentSearchResults([]);
+      // For other categories, use debounce
+      if (query.trim().length >= 2) {
+        const timeout = setTimeout(() => {
+          searchContent(query);
+        }, 500);
+        setSearchTimeout(timeout);
+      } else {
+        setContentSearchResults([]);
+      }
     }
   };
 
-  const addContentToList = async (item: any) => {
-    if (!listDetail || !currentUser) return;
-    
-    try {
-      // Check if item already exists in the list
-      const existingItem = listItems.find(listItem => 
-        listItem.content_id === item.content_id && listItem.content_type === item.content_type
-      );
-      
-      if (existingItem) {
-        Alert.alert('Item Already Exists', 'This item is already in your list');
-        return;
-      }
-      
-      // Get the next position
-      const nextPosition = Math.max(...listItems.map(item => item.position), 0) + 1;
-      
-      // Insert new item
-      const { data: newItem, error } = await supabase
-        .from('list_items')
-        .insert({
-          list_id: listDetail.id,
-          external_id: item.content_id,
-          title: item.title,
-          subtitle: item.subtitle,
-          description: item.description,
-          image_url: item.image_url,
-          content_id: item.content_id,
-          content_type: item.content_type,
-          external_data: item.external_data,
-          position: nextPosition,
-          source: 'api'
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error adding item to list:', error);
-        Alert.alert('Error', 'Failed to add item to list');
-        return;
-      }
-      
-      // Update local state
-      setListItems([...listItems, newItem]);
-      setListDetail({
-        ...listDetail,
-        item_count: listDetail.item_count + 1
-      });
-      
-      // Close modal and reset search
-      setShowAddContentModal(false);
-      setContentSearchQuery('');
-      setContentSearchResults([]);
-      
-      Alert.alert('Success', 'Item added to your list!');
-      
-    } catch (error) {
-      console.error('Error adding content to list:', error);
-      Alert.alert('Error', 'Failed to add item to list');
-    }
-  };
+  // Legacy function - now using batch selection instead
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -1360,7 +1547,7 @@ export default function ListDetailScreen() {
 
             <View style={styles.listStats}>
               <Text style={styles.statText}>{listDetail.item_count} items</Text>
-              <Text style={styles.separator}>•</Text>
+              <Text style={styles.separator}> • </Text>
               <Text style={styles.statText}>
                 Created {new Date(listDetail.created_at).toLocaleDateString()}
               </Text>
@@ -1383,18 +1570,7 @@ export default function ListDetailScreen() {
             </View>
           )}
           
-          {/* Add Content Button - Only for list owners */}
-          {isListOwner && !reorderMode && (
-            <View style={styles.addContentSection}>
-              <TouchableOpacity 
-                style={styles.addContentButton}
-                onPress={() => setShowAddContentModal(true)}
-              >
-                <Plus size={20} color="#F97316" />
-                <Text style={styles.addContentText}>Add Content</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {/* Add Content Button removed from here - moved to three-dots menu */}
           
           {listItems.length === 0 ? (
             <View style={styles.emptyState}>
@@ -1553,32 +1729,145 @@ export default function ListDetailScreen() {
             keyExtractor={(item) => item.id}
             showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
-              <View style={styles.commentItem}>
-                {item.users_profiles?.avatar_url ? (
-                  <Image 
-                    source={{ uri: item.users_profiles.avatar_url }} 
-                    style={styles.commentAvatar} 
-                  />
-                ) : (
-                  <View style={styles.commentAvatar}>
-                    <Text style={styles.commentAvatarText}>
-                      {item.users_profiles?.full_name?.charAt(0) || 
-                       item.users_profiles?.username?.charAt(0) || '?'}
-                    </Text>
+              <View>
+                {/* Main Comment */}
+                <View style={styles.commentItem}>
+                  {item.users_profiles?.avatar_url ? (
+                    <Image 
+                      source={{ uri: item.users_profiles.avatar_url }} 
+                      style={styles.commentAvatar} 
+                    />
+                  ) : (
+                    <View style={styles.commentAvatar}>
+                      <Text style={styles.commentAvatarText}>
+                        {item.users_profiles?.full_name?.charAt(0) || 
+                         item.users_profiles?.username?.charAt(0) || '?'}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.commentContent}>
+                    <View style={styles.commentHeader}>
+                      <Text style={styles.commentUsername}>
+                        {item.users_profiles?.username || 'unknown'}
+                      </Text>
+                      <Text style={styles.commentTime}>
+                        {formatCommentTime(item.created_at)}
+                      </Text>
+                      {currentUser?.id === item.user_id && (
+                        <TouchableOpacity 
+                          style={styles.deleteCommentButton}
+                          onPress={() => deleteComment(item.id)}
+                          disabled={deletingComment === item.id}
+                        >
+                          {deletingComment === item.id ? (
+                            <ActivityIndicator size="small" color="#EF4444" />
+                          ) : (
+                            <Trash size={16} color="#EF4444" />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    <Text style={styles.commentText}>{item.content}</Text>
+                    
+                    {/* Comment Actions */}
+                    <View style={styles.commentActions}>
+                      <TouchableOpacity 
+                        style={styles.replyButton}
+                        onPress={() => setReplyingTo(replyingTo === item.id ? null : item.id)}
+                      >
+                        <Text style={styles.replyButtonText}>Reply</Text>
+                      </TouchableOpacity>
+                    </View>
+                    
+                    {/* Reply Input for this comment */}
+                    {replyingTo === item.id && (
+                      <View style={styles.replyInputContainer}>
+                        <TextInput
+                          style={styles.replyInput}
+                          placeholder="Write a reply..."
+                          value={replyText}
+                          onChangeText={setReplyText}
+                          multiline
+                          maxLength={500}
+                        />
+                        <View style={styles.replyActions}>
+                          <TouchableOpacity 
+                            style={styles.cancelReplyButton}
+                            onPress={() => {
+                              setReplyingTo(null);
+                              setReplyText('');
+                            }}
+                          >
+                            <Text style={styles.cancelReplyText}>Cancel</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity 
+                            style={[
+                              styles.sendReplyButton,
+                              (!replyText.trim() || postingComment) && styles.sendReplyButtonDisabled
+                            ]}
+                            onPress={() => postComment(item.id)}
+                            disabled={!replyText.trim() || postingComment}
+                          >
+                            {postingComment ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.sendReplyText}>Reply</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Replies */}
+                {item.replies && item.replies.length > 0 && (
+                  <View style={styles.repliesContainer}>
+                    {item.replies.map((reply) => (
+                      <View key={reply.id} style={styles.replyItem}>
+                        {reply.users_profiles?.avatar_url ? (
+                          <Image 
+                            source={{ uri: reply.users_profiles.avatar_url }} 
+                            style={styles.replyAvatar} 
+                          />
+                        ) : (
+                          <View style={styles.replyAvatar}>
+                            <Text style={styles.replyAvatarText}>
+                              {reply.users_profiles?.full_name?.charAt(0) || 
+                               reply.users_profiles?.username?.charAt(0) || '?'}
+                            </Text>
+                          </View>
+                        )}
+                        
+                        <View style={styles.replyContent}>
+                          <View style={styles.replyHeader}>
+                            <Text style={styles.replyUsername}>
+                              {reply.users_profiles?.username || 'unknown'}
+                            </Text>
+                            <Text style={styles.replyTime}>
+                              {formatCommentTime(reply.created_at)}
+                            </Text>
+                            {currentUser?.id === reply.user_id && (
+                              <TouchableOpacity 
+                                style={styles.deleteReplyButton}
+                                onPress={() => deleteComment(reply.id, item.id)}
+                                disabled={deletingComment === reply.id}
+                              >
+                                {deletingComment === reply.id ? (
+                                  <ActivityIndicator size="small" color="#EF4444" />
+                                ) : (
+                                  <Trash size={14} color="#EF4444" />
+                                )}
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                          <Text style={styles.replyText}>{reply.content}</Text>
+                        </View>
+                      </View>
+                    ))}
                   </View>
                 )}
-                
-                <View style={styles.commentContent}>
-                  <View style={styles.commentHeader}>
-                    <Text style={styles.commentUsername}>
-                      {item.users_profiles?.username || 'unknown'}
-                    </Text>
-                    <Text style={styles.commentTime}>
-                      {formatCommentTime(item.created_at)}
-                    </Text>
-                  </View>
-                  <Text style={styles.commentText}>{item.content}</Text>
-                </View>
               </View>
             )}
             ListEmptyComponent={() => (
@@ -1636,6 +1925,10 @@ export default function ListDetailScreen() {
           <View style={styles.optionsMenu}>
             {isListOwner && (
               <>
+                <TouchableOpacity style={styles.optionItem} onPress={() => setShowAddContentModal(true)}>
+                  <Plus size={20} color="#F97316" />
+                  <Text style={styles.optionText}>Add Content</Text>
+                </TouchableOpacity>
                 <TouchableOpacity style={styles.optionItem} onPress={handleEditList}>
                   <PencilSimple size={20} color="#374151" />
                   <Text style={styles.optionText}>Edit List</Text>
@@ -1799,43 +2092,86 @@ export default function ListDetailScreen() {
       <Modal
         visible={showAddContentModal}
         animationType="slide"
-        onRequestClose={() => setShowAddContentModal(false)}
+        onRequestClose={closeAddContentModal}
       >
         <KeyboardAvoidingView 
           style={styles.addContentModal}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.addContentHeader}>
-            <TouchableOpacity onPress={() => setShowAddContentModal(false)}>
+            <TouchableOpacity onPress={closeAddContentModal}>
               <Text style={styles.addContentCancelButton}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={styles.addContentTitle}>Add Content</Text>
-            <View style={styles.addContentSpacer} />
+            <Text style={styles.addContentTitle}>
+              Add Content {selectedItems.length > 0 && `(${selectedItems.length})`}
+            </Text>
+            {selectedItems.length > 0 && (
+              <TouchableOpacity 
+                onPress={handleFinishSelection}
+                disabled={isAddingItems}
+                style={styles.finishButton}
+              >
+                {isAddingItems ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.finishButtonText}>Finish</Text>
+                )}
+              </TouchableOpacity>
+            )}
+            {selectedItems.length === 0 && <View style={styles.addContentSpacer} />}
           </View>
           
           <View style={styles.addContentBody}>
-            <View style={styles.searchInputContainer}>
-              <MagnifyingGlass size={20} color="#6B7280" style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder={`Search ${listDetail?.categories?.display_name || listDetail?.category || 'content'}...`}
-                value={contentSearchQuery}
-                onChangeText={handleContentSearch}
-                returnKeyType="search"
-                autoFocus
-              />
-              {contentSearchQuery.length > 0 && (
-                <TouchableOpacity 
-                  onPress={() => {
-                    setContentSearchQuery('');
-                    setContentSearchResults([]);
-                  }}
-                  style={styles.clearButton}
-                >
-                  <X size={16} color="#6B7280" />
-                </TouchableOpacity>
-              )}
-            </View>
+            {listDetail?.category === 'videos' ? (
+              <View style={styles.searchInputContainer}>
+                <Text style={styles.youtubeInputLabel}>YouTube Video URL</Text>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Paste YouTube video URL here..."
+                  value={contentSearchQuery}
+                  onChangeText={handleContentSearch}
+                  returnKeyType="done"
+                  autoFocus
+                  keyboardType="url"
+                />
+                {contentSearchQuery.length > 0 && (
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setContentSearchQuery('');
+                      setContentSearchResults([]);
+                      setSelectedItems([]);
+                    }}
+                    style={styles.clearButton}
+                  >
+                    <X size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              <View style={styles.searchInputContainer}>
+                <MagnifyingGlass size={20} color="#6B7280" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={`Search ${listDetail?.categories?.display_name || listDetail?.category || 'content'}...`}
+                  value={contentSearchQuery}
+                  onChangeText={handleContentSearch}
+                  returnKeyType="search"
+                  autoFocus
+                />
+                {contentSearchQuery.length > 0 && (
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setContentSearchQuery('');
+                      setContentSearchResults([]);
+                      setSelectedItems([]);
+                    }}
+                    style={styles.clearButton}
+                  >
+                    <X size={16} color="#6B7280" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
             
             {isSearchingContent && (
               <View style={styles.searchLoadingContainer}>
@@ -1849,30 +2185,42 @@ export default function ListDetailScreen() {
               keyExtractor={(item) => item.id.toString()}
               showsVerticalScrollIndicator={false}
               style={styles.searchResults}
-              renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.searchResultItem}
-                  onPress={() => addContentToList(item)}
-                >
-                  {item.image_url ? (
-                    <Image source={{ uri: item.image_url }} style={styles.searchResultImage} />
-                  ) : (
-                    <View style={styles.searchResultImagePlaceholder}>
-                      <Text style={styles.searchResultEmoji}>{getItemEmoji(item.content_type)}</Text>
+              renderItem={({ item }) => {
+                const isSelected = isItemSelected(item.id);
+                return (
+                  <TouchableOpacity 
+                    style={[
+                      styles.searchResultItem,
+                      isSelected && styles.searchResultItemSelected
+                    ]}
+                    onPress={() => toggleItemSelection(item)}
+                  >
+                    {item.image_url ? (
+                      <Image source={{ uri: item.image_url }} style={styles.searchResultImage} />
+                    ) : (
+                      <View style={styles.searchResultImagePlaceholder}>
+                        <Text style={styles.searchResultEmoji}>{getItemEmoji(item.content_type)}</Text>
+                      </View>
+                    )}
+                    <View style={styles.searchResultContent}>
+                      <Text style={styles.searchResultTitle} numberOfLines={2}>{item.title}</Text>
+                      {item.subtitle && (
+                        <Text style={styles.searchResultSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+                      )}
+                      {item.description && (
+                        <Text style={styles.searchResultDescription} numberOfLines={2}>{item.description}</Text>
+                      )}
                     </View>
-                  )}
-                  <View style={styles.searchResultContent}>
-                    <Text style={styles.searchResultTitle} numberOfLines={2}>{item.title}</Text>
-                    {item.subtitle && (
-                      <Text style={styles.searchResultSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-                    )}
-                    {item.description && (
-                      <Text style={styles.searchResultDescription} numberOfLines={2}>{item.description}</Text>
-                    )}
-                  </View>
-                  <Plus size={20} color="#F97316" />
-                </TouchableOpacity>
-              )}
+                    <View style={styles.selectionIndicator}>
+                      {isSelected ? (
+                        <Check size={20} color="#FFFFFF" />
+                      ) : (
+                        <Plus size={20} color="#F97316" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              }}
               ListEmptyComponent={() => {
                 if (!contentSearchQuery.trim()) {
                   return (
@@ -2329,7 +2677,7 @@ const styles = StyleSheet.create({
   },
   commentInputWrapper: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     backgroundColor: '#F9FAFB',
     borderRadius: 24,
     paddingHorizontal: 16,
@@ -2355,6 +2703,134 @@ const styles = StyleSheet.create({
   },
   commentSendButtonDisabled: {
     backgroundColor: '#D1D5DB',
+  },
+  
+  // Comment Actions and Reply Styles
+  commentActions: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  replyButton: {
+    paddingVertical: 4,
+  },
+  replyButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  deleteCommentButton: {
+    marginLeft: 'auto',
+    padding: 4,
+  },
+  deleteReplyButton: {
+    marginLeft: 'auto',
+    padding: 2,
+  },
+  
+  // Reply Container Styles
+  replyInputContainer: {
+    marginTop: 12,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 12,
+  },
+  replyInput: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    maxHeight: 80,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  replyActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 8,
+    gap: 8,
+  },
+  cancelReplyButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  cancelReplyText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  sendReplyButton: {
+    backgroundColor: '#F97316',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  sendReplyButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  sendReplyText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  
+  // Replies Container Styles
+  repliesContainer: {
+    marginLeft: 40,
+    marginTop: 8,
+    paddingLeft: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: '#E5E7EB',
+  },
+  replyItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  replyAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F97316',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  replyAvatarText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  replyContent: {
+    flex: 1,
+  },
+  replyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  replyUsername: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#374151',
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  replyTime: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  replyText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
   },
   
   // Options Menu Styles
@@ -2625,6 +3101,21 @@ const styles = StyleSheet.create({
   addContentSpacer: {
     width: 60,
   },
+  finishButton: {
+    backgroundColor: '#F97316',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  finishButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
   addContentBody: {
     flex: 1,
     padding: 20,
@@ -2648,6 +3139,13 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 16,
     color: '#1F2937',
+  },
+  youtubeInputLabel: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
   },
   clearButton: {
     padding: 4,
@@ -2674,6 +3172,18 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
     gap: 12,
+  },
+  searchResultItemSelected: {
+    backgroundColor: '#FEF3C7',
+    borderBottomColor: '#F59E0B',
+  },
+  selectionIndicator: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F97316',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   searchResultImage: {
     width: 60,
