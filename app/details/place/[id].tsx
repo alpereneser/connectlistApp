@@ -20,11 +20,10 @@ import {
   Phone, 
   Clock, 
   Star, 
-  Share as ShareIcon,
+  Share,
   Heart,
   Plus,
-  Camera,
-  Navigation 
+  Camera
 } from 'phosphor-react-native';
 import AppBar from '../../../components/AppBar';
 import { getPlaceDetails, PlaceResult } from '../../../services/googleMapsApi';
@@ -188,7 +187,7 @@ export default function PlaceDetailScreen() {
               style={styles.actionButton}
               onPress={handleShare}
             >
-              <ShareIcon size={20} color="#FFFFFF" />
+              <Share size={20} color="#FFFFFF" />
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -242,7 +241,7 @@ export default function PlaceDetailScreen() {
                 <Text style={styles.detailLabel}>Address</Text>
                 <Text style={styles.detailText}>{place.address}</Text>
               </View>
-              <Navigation size={16} color="#F97316" />
+              <MapPin size={16} color="#F97316" />
             </TouchableOpacity>
           )}
 
