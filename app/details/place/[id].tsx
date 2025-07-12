@@ -21,9 +21,11 @@ import {
   Clock, 
   Star, 
   Heart,
-  Plus
+  Plus,
+  Users
 } from 'phosphor-react-native';
 import AppBar from '../../../components/AppBar';
+import BottomMenu from '../../../components/BottomMenu';
 import { getPlaceDetails, PlaceResult } from '../../../services/googleMapsApi';
 import { supabase } from '../../../lib/supabase';
 
@@ -155,6 +157,32 @@ export default function PlaceDetailScreen() {
     });
   };
 
+  const handleWhoAddedList = () => {
+    // Bu mekanı hangi kullanıcıların listelerine eklediğini göster
+    if (!place) return;
+    
+    // TODO: Implement place usage analytics
+    Alert.alert(
+      'Who Added This Place',
+      'This feature will show which users have added this place to their lists.',
+      [{ text: 'OK', style: 'default' }]
+    );
+  };
+
+  const handleTabPress = (tab: string) => {
+    if (tab === 'home') {
+      router.push('/');
+    } else if (tab === 'search') {
+      router.push('/search');
+    } else if (tab === 'discover') {
+      router.push('/discover');
+    } else if (tab === 'profile') {
+      router.push('/profile');
+    } else if (tab === 'add') {
+      router.push('/create');
+    }
+  };
+
   const renderImageCarousel = () => {
     if (!place?.image) {
       return (
@@ -281,6 +309,17 @@ export default function PlaceDetailScreen() {
             </View>
           )}
         </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity 
+            style={styles.whoAddedButton}
+            onPress={handleWhoAddedList}
+          >
+            <Users size={20} color="#F97316" />
+            <Text style={styles.whoAddedButtonText}>Who Added This</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -299,6 +338,8 @@ export default function PlaceDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <AppBar title="Place Details" />
+      
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {renderImageCarousel()}
         {renderPlaceInfo()}
@@ -312,6 +353,8 @@ export default function PlaceDetailScreen() {
         <Plus size={24} color="#FFFFFF" weight="bold" />
         <Text style={styles.addToListText}>Add to List</Text>
       </TouchableOpacity>
+
+      <BottomMenu activeTab="" onTabPress={handleTabPress} />
     </View>
   );
 }
@@ -470,7 +513,7 @@ const styles = StyleSheet.create({
   },
   addToListButton: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 100, // Bottom menu yüksekliği + margin
     right: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,6 +540,30 @@ const styles = StyleSheet.create({
   shareButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  actionButtonsContainer: {
+    marginTop: 24,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  whoAddedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF3E2',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F97316',
+    gap: 8,
+  },
+  whoAddedButtonText: {
+    color: '#F97316',
+    fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Inter',
   },
