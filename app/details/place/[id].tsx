@@ -313,6 +313,14 @@ export default function PlaceDetailScreen() {
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity 
+            style={styles.addToListButtonInline}
+            onPress={handleAddToList}
+          >
+            <Plus size={20} color="#FFFFFF" />
+            <Text style={styles.addToListButtonText}>Add to List</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
             style={styles.whoAddedButton}
             onPress={handleWhoAddedList}
           >
@@ -344,15 +352,6 @@ export default function PlaceDetailScreen() {
         {renderImageCarousel()}
         {renderPlaceInfo()}
       </ScrollView>
-      
-      {/* Floating Action Button */}
-      <TouchableOpacity 
-        style={styles.addToListButton}
-        onPress={handleAddToList}
-      >
-        <Plus size={24} color="#FFFFFF" weight="bold" />
-        <Text style={styles.addToListText}>Add to List</Text>
-      </TouchableOpacity>
 
       <BottomMenu activeTab="" onTabPress={handleTabPress} />
     </View>
@@ -511,32 +510,6 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     fontFamily: 'Inter',
   },
-  addToListButton: {
-    position: 'absolute',
-    bottom: 100, // Bottom menu yüksekliği + margin
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F97316',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  addToListText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter',
-  },
   shareButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
@@ -544,12 +517,32 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
   },
   actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 24,
     paddingTop: 20,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
+  addToListButtonInline: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F97316',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 8,
+  },
+  addToListButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
   whoAddedButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
