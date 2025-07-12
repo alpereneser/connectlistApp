@@ -14,13 +14,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { 
-  ArrowLeft, 
   MapPin, 
   Globe, 
   Phone, 
   Clock, 
-  Star, 
-  Heart,
+  Star,
   Plus,
   Users
 } from 'phosphor-react-native';
@@ -36,7 +34,6 @@ export default function PlaceDetailScreen() {
   const router = useRouter();
   const [place, setPlace] = useState<PlaceResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isLiked, setIsLiked] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
@@ -158,15 +155,15 @@ export default function PlaceDetailScreen() {
   };
 
   const handleWhoAddedList = () => {
-    // Bu mekanı hangi kullanıcıların listelerine eklediğini göster
     if (!place) return;
     
-    // TODO: Implement place usage analytics
-    Alert.alert(
-      'Who Added This Place',
-      'This feature will show which users have added this place to their lists.',
-      [{ text: 'OK', style: 'default' }]
-    );
+    // Who Added This sayfasına git
+    const params = new URLSearchParams({
+      contentType: 'place',
+      contentTitle: encodeURIComponent(place.name),
+    });
+    
+    router.push(`/who-added/${place.id}?${params.toString()}`);
   };
 
   const handleTabPress = (tab: string) => {
@@ -180,6 +177,8 @@ export default function PlaceDetailScreen() {
       router.push('/profile');
     } else if (tab === 'add') {
       router.push('/create');
+    } else if (tab === 'notifications') {
+      router.push('/notifications');
     }
   };
 
@@ -201,35 +200,6 @@ export default function PlaceDetailScreen() {
             </View>
           )}
           
-          {/* Image Overlay with Back and Actions */}
-          <View style={styles.imageOverlay}>
-            <TouchableOpacity 
-              style={styles.backButton}
-              onPress={() => router.back()}
-            >
-              <ArrowLeft size={24} color="#FFFFFF" weight="bold" />
-            </TouchableOpacity>
-            
-            <View style={styles.imageActions}>
-              <TouchableOpacity 
-                style={styles.overlayActionButton}
-                onPress={handleShare}
-              >
-                <Text style={styles.shareButtonText}>Share</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.overlayActionButton, isLiked && styles.likedButton]}
-                onPress={() => setIsLiked(!isLiked)}
-              >
-                <Heart 
-                  size={20} 
-                  color={isLiked ? "#FF385C" : "#FFFFFF"} 
-                  weight={isLiked ? "fill" : "regular"} 
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
 
         {/* Action Buttons Below Image */}
@@ -246,7 +216,7 @@ export default function PlaceDetailScreen() {
             style={styles.secondaryActionButton}
             onPress={handleWhoAddedList}
           >
-            <Users size={20} color="#FF385C" />
+            <Users size={20} color="#FF6B35" />
             <Text style={styles.secondaryActionText}>Who Added This</Text>
           </TouchableOpacity>
         </View>
@@ -286,27 +256,17 @@ export default function PlaceDetailScreen() {
           {place.address && (
             <TouchableOpacity style={styles.detailCard} onPress={handleOpenInMaps}>
               <View style={styles.detailCardHeader}>
-                <MapPin size={24} color="#FF385C" />
+                <MapPin size={24} color="#FF6B35" />
                 <Text style={styles.detailCardTitle}>Location</Text>
               </View>
               <Text style={styles.detailCardText}>{place.address}</Text>
             </TouchableOpacity>
           )}
 
-          {place.phone && (
-            <TouchableOpacity style={styles.detailCard} onPress={handleCallPhone}>
-              <View style={styles.detailCardHeader}>
-                <Phone size={24} color="#FF385C" />
-                <Text style={styles.detailCardTitle}>Contact</Text>
-              </View>
-              <Text style={styles.detailCardText}>{place.phone}</Text>
-            </TouchableOpacity>
-          )}
-
           {place.website && (
             <TouchableOpacity style={styles.detailCard} onPress={handleOpenWebsite}>
               <View style={styles.detailCardHeader}>
-                <Globe size={24} color="#FF385C" />
+                <Globe size={24} color="#FF6B35" />
                 <Text style={styles.detailCardTitle}>Website</Text>
               </View>
               <Text style={styles.detailCardText} numberOfLines={1}>
@@ -315,13 +275,28 @@ export default function PlaceDetailScreen() {
             </TouchableOpacity>
           )}
 
-          {place.workingHours && (
-            <View style={styles.detailCard}>
-              <View style={styles.detailCardHeader}>
-                <Clock size={24} color="#FF385C" />
-                <Text style={styles.detailCardTitle}>Hours</Text>
-              </View>
-              <Text style={styles.detailCardText}>{place.workingHours}</Text>
+          {/* Contact and Hours - Side by Side */}
+          {(place.phone || place.workingHours) && (
+            <View style={styles.sideBySideContainer}>
+              {place.phone && (
+                <TouchableOpacity style={styles.halfWidthCard} onPress={handleCallPhone}>
+                  <View style={styles.detailCardHeader}>
+                    <Phone size={24} color="#FF6B35" />
+                    <Text style={styles.detailCardTitle}>Contact</Text>
+                  </View>
+                  <Text style={styles.detailCardText}>{place.phone}</Text>
+                </TouchableOpacity>
+              )}
+
+              {place.workingHours && (
+                <View style={styles.halfWidthCard}>
+                  <View style={styles.detailCardHeader}>
+                    <Clock size={24} color="#FF6B35" />
+                    <Text style={styles.detailCardTitle}>Hours</Text>
+                  </View>
+                  <Text style={styles.detailCardText}>{place.workingHours}</Text>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -334,7 +309,7 @@ export default function PlaceDetailScreen() {
       <View style={styles.container}>
         <AppBar title="Place Details" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#F97316" />
+          <ActivityIndicator size="large" color="#FF6B35" />
           <Text style={styles.loadingText}>Loading place details...</Text>
         </View>
       </View>
@@ -343,6 +318,7 @@ export default function PlaceDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <AppBar title="Place Details" />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {renderHeroSection()}
         {renderPlaceInfo()}
@@ -400,56 +376,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '500',
   },
-  imageOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 20,
-    paddingTop: 50,
-  },
-  backButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  imageActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  overlayActionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  likedButton: {
-    backgroundColor: 'rgba(255, 56, 92, 0.1)',
-  },
-  shareButtonText: {
-    color: '#222222',
-    fontSize: 10,
-    fontWeight: '600',
-    fontFamily: 'Inter',
-  },
   
   // Quick Actions
   quickActionsContainer: {
@@ -466,7 +392,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FF385C',
+    backgroundColor: '#FF6B35',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -492,7 +418,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   secondaryActionText: {
-    color: '#FF385C',
+    color: '#FF6B35',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Inter',
@@ -584,5 +510,19 @@ const styles = StyleSheet.create({
     color: '#717171',
     fontFamily: 'Inter',
     lineHeight: 20,
+  },
+  
+  // Side by Side Cards
+  sideBySideContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  halfWidthCard: {
+    flex: 1,
+    backgroundColor: '#F7F7F7',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#EBEBEB',
   },
 });

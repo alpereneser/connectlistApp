@@ -314,7 +314,7 @@ export default function PersonDetailScreen() {
                         </Text>
                         <View style={styles.knownForRating}>
                           <Star size={12} color="#F59E0B" weight="fill" />
-                          <Text style={styles.knownForRatingText}>{item.vote_average.toFixed(1)}</Text>
+                          <Text style={styles.knownForRatingText}>{(item.vote_average || 0).toFixed(1)}</Text>
                         </View>
                       </View>
                     );
@@ -334,7 +334,7 @@ export default function PersonDetailScreen() {
               </View>
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Popularity:</Text>
-                <Text style={styles.detailValue}>{person.popularity.toFixed(1)}</Text>
+                <Text style={styles.detailValue}>{(person.popularity || 0).toFixed(1)}</Text>
               </View>
               {person.deathday && (
                 <View style={styles.detailItem}>

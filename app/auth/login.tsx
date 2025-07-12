@@ -79,6 +79,32 @@ export default function LoginScreen() {
     router.push('/auth/forgot-password');
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: Platform.OS === 'web' 
+            ? `${window.location.origin}/auth/callback`
+            : 'connectlist://auth/callback',
+        },
+      });
+
+      if (error) {
+        Alert.alert('Google Sign In Error', error.message);
+        console.error('Google auth error:', error);
+      } else {
+        console.log('Google auth initiated successfully');
+      }
+    } catch (error) {
+      console.error('Google auth error:', error);
+      Alert.alert('Error', 'An error occurred during Google sign in.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
@@ -160,6 +186,26 @@ export default function LoginScreen() {
             <Text style={styles.loginButtonText}>
               {loading ? 'Signing In...' : 'Sign In'}
             </Text>
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.divider} />
+          </View>
+
+          {/* Google Sign In Button */}
+          <TouchableOpacity
+            style={[styles.googleButton, loading && styles.disabledButton]}
+            onPress={handleGoogleLogin}
+            disabled={loading}
+          >
+            <Image 
+              source={{ uri: 'https://developers.google.com/identity/images/g-logo.png' }}
+              style={styles.googleIcon}
+            />
+            <Text style={styles.googleButtonText}>Continue with Google</Text>
           </TouchableOpacity>
         </View>
 
@@ -278,5 +324,43 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontWeight: '600',
     color: '#FF6B35',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '400',
+    color: '#9CA3AF',
+  },
+  googleButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    height: 56,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  googleIcon: {
+    width: 20,
+    height: 20,
+    marginRight: 12,
+  },
+  googleButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter',
+    fontWeight: '600',
+    color: '#1F2937',
   },
 });

@@ -50,6 +50,8 @@ export default function SearchScreen() {
       router.push('/profile');
     } else if (tab === 'add') {
       router.push('/create');
+    } else if (tab === 'notifications') {
+      router.push('/notifications');
     }
   };
 

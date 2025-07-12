@@ -342,6 +342,8 @@ export default function ProfileScreen({ onTabPress, userId: propUserId }: Profil
       router.push('/discover');
     } else if (tab === 'profile') {
       // Already on profile page, do nothing
+    } else if (tab === 'notifications') {
+      router.push('/notifications');
     }
   }, [router]);
 
@@ -1093,10 +1095,11 @@ export default function ProfileScreen({ onTabPress, userId: propUserId }: Profil
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgb(245, 245, 245)',
   },
   content: {
     flex: 1,
+    backgroundColor: 'rgb(245, 245, 245)',
   },
   profileHeader: {
     padding: 16,
@@ -1267,7 +1270,7 @@ const styles = StyleSheet.create({
   },
 
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgb(245, 245, 245)',
     paddingHorizontal: 16,
     paddingVertical: 20,
     marginBottom: 8,

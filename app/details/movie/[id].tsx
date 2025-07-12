@@ -15,7 +15,7 @@ import { Star, Calendar, Clock, Users, Heart, Share, ArrowLeft, Plus, Eye } from
 import AppBar from '../../../components/AppBar';
 import BottomMenu from '../../../components/BottomMenu';
 import { fontConfig } from '../../../styles/global';
-import { getImageUrl } from '../../../services/tmdbApi';
+import { getImageUrl, getMovieCredits, CastMember } from '../../../services/tmdbApi';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -43,8 +43,9 @@ export default function MovieDetailScreen() {
   const { id, data } = useLocalSearchParams();
   const router = useRouter();
   const [movie, setMovie] = useState<MovieDetail | null>(null);
+  const [cast, setCast] = useState<CastMember[]>([]);
+  const [showAllCast, setShowAllCast] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     loadMovieDetails();
@@ -58,22 +59,33 @@ export default function MovieDetailScreen() {
         try {
           const movieData = JSON.parse(decodeURIComponent(String(data)));
           setMovie(movieData);
+          
+          // Gerçek cast verilerini TMDB'den çek
+          console.log('Fetching cast for movie ID:', movieData.id);
+          const movieCast = await getMovieCredits(movieData.id);
+          console.log('Movie cast received:', movieCast.length, 'cast members');
+          console.log('First 3 cast members:', movieCast.slice(0, 3).map(c => ({ 
+            name: c.name, 
+            profile_path: c.profile_path,
+            imageUrl: c.profile_path ? getImageUrl(c.profile_path, 'w185') : 'No image'
+          })));
+          setCast(movieCast);
         } catch (parseError) {
           console.error('Movie data parse error:', parseError);
-          setMockMovie();
+          await setMockMovie();
         }
       } else {
-        setMockMovie();
+        await setMockMovie();
       }
     } catch (error) {
       console.error('Error loading movie details:', error);
-      setMockMovie();
+      await setMockMovie();
     } finally {
       setLoading(false);
     }
   };
 
-  const setMockMovie = () => {
+  const setMockMovie = async () => {
     const mockMovie: MovieDetail = {
       id: Number(id),
       title: 'Sample Movie',
@@ -91,23 +103,50 @@ export default function MovieDetailScreen() {
       status: 'Released'
     };
     setMovie(mockMovie);
+    
+    // Mock movie için de gerçek API'yi dene, olmassa fallback olarak mock cast kullan
+    try {
+      const movieCast = await getMovieCredits(Number(id));
+      setCast(movieCast);
+    } catch (error) {
+      console.error('Error fetching mock movie cast:', error);
+      setMockCast();
+    }
+  };
+
+  const setMockCast = () => {
+    // Set mock cast with actual TMDB profile paths
+    const mockCast: CastMember[] = [
+      { id: 1, name: 'Robert Downey Jr.', character: 'Tony Stark', profile_path: '/5qHNjhtjMD4YWH3UP0rm4tKwxCL.jpg', order: 0 },
+      { id: 2, name: 'Chris Evans', character: 'Steve Rogers', profile_path: '/3bOGNsHlrswhyW79uvIHH1V43JI.jpg', order: 1 },
+      { id: 3, name: 'Scarlett Johansson', character: 'Natasha Romanoff', profile_path: '/3JTEc2tGUact9c0WktvpeJ9pajn.jpg', order: 2 },
+      { id: 4, name: 'Chris Hemsworth', character: 'Thor', profile_path: '/jpurJ9jAcLCYjgHHfYF32m3zJYm.jpg', order: 3 },
+      { id: 5, name: 'Mark Ruffalo', character: 'Bruce Banner', profile_path: '/z3dvKqMNDQWk3QLxzumloQVR0pv.jpg', order: 4 },
+      { id: 6, name: 'Jeremy Renner', character: 'Clint Barton', profile_path: '/lMaDAEErx0gZyUypPOmz1v17vPr.jpg', order: 5 },
+      { id: 7, name: 'Tom Holland', character: 'Peter Parker', profile_path: '/RhNNQGJWKLECPKzUQreAf1QsrH.jpg', order: 6 },
+      { id: 8, name: 'Brie Larson', character: 'Carol Danvers', profile_path: '/iqaHjZ4CtOqJArH9B3DkMkKWTDq.jpg', order: 7 },
+      { id: 9, name: 'Anthony Mackie', character: 'Sam Wilson', profile_path: '/bWYpdmF8gL3ZZ2zg8eT4W4v4LhX.jpg', order: 8 },
+      { id: 10, name: 'Sebastian Stan', character: 'Bucky Barnes', profile_path: '/qbdLpJrwWwKGfMNE31Oq8VGGXhx.jpg', order: 9 },
+    ];
+    setCast(mockCast);
   };
 
   const handleTabPress = (tab: string) => {
-    router.push(`/${tab}`);
+    if (tab === 'home') {
+      router.push('/');
+    } else if (tab === 'search') {
+      router.push('/search');
+    } else if (tab === 'discover') {
+      router.push('/discover');
+    } else if (tab === 'profile') {
+      router.push('/profile');
+    } else if (tab === 'add') {
+      router.push('/create');
+    } else if (tab === 'notifications') {
+      router.push('/notifications');
+    }
   };
 
-  const handleBack = () => {
-    router.back();
-  };
-
-  const handleShare = () => {
-    console.log('Share movie');
-  };
-
-  const handleFavorite = () => {
-    setIsFavorite(!isFavorite);
-  };
 
   const handleAddToList = () => {
     console.log('Add to list');
@@ -115,8 +154,24 @@ export default function MovieDetailScreen() {
   };
 
   const handleWhoAddedList = () => {
-    console.log('Who added to list');
-    // TODO: Who added to list functionality
+    if (!movie) return;
+    
+    // Who Added This sayfasına git - PlaceDetails'tekine benzer yapı
+    const params = new URLSearchParams({
+      contentType: 'movie',
+      contentTitle: encodeURIComponent(movie.title),
+    });
+    
+    router.push(`/who-added/${movie.id}?${params.toString()}`);
+  };
+
+  const handlePersonPress = (person: CastMember) => {
+    const personData = {
+      id: person.id,
+      name: person.name,
+      profile_path: person.profile_path,
+    };
+    router.push(`/details/person/${person.id}?data=${encodeURIComponent(JSON.stringify(personData))}`);
   };
 
   const formatRuntime = (minutes?: number) => {
@@ -140,7 +195,7 @@ export default function MovieDetailScreen() {
       <View style={styles.container}>
         <AppBar title="Movie Details" />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color="#FF6B35" />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
         <BottomMenu activeTab="search" onTabPress={handleTabPress} />
@@ -165,6 +220,7 @@ export default function MovieDetailScreen() {
 
   return (
     <View style={styles.container}>
+      <AppBar title={movie?.title || 'Movie Details'} />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Backdrop Image */}
         <View style={styles.imageContainer}>
@@ -175,24 +231,6 @@ export default function MovieDetailScreen() {
             style={styles.backdropImage} 
           />
           
-          {/* Header Actions */}
-          <View style={styles.headerActions}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleBack}>
-              <ArrowLeft size={24} color="#FFFFFF" weight="bold" />
-            </TouchableOpacity>
-            <View style={styles.rightActions}>
-              <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-                <Share size={24} color="#FFFFFF" weight="bold" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={handleFavorite}>
-                <Heart
-                  size={24}
-                  color={isFavorite ? "#EF4444" : "#FFFFFF"}
-                  weight={isFavorite ? "fill" : "bold"}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
         </View>
 
         {/* Content */}
@@ -239,7 +277,7 @@ export default function MovieDetailScreen() {
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.secondaryButton} onPress={handleWhoAddedList}>
-              <Eye size={20} color="#3B82F6" weight="bold" />
+              <Eye size={20} color="#FF6B35" weight="bold" />
               <Text style={styles.secondaryButtonText}>Who Added List</Text>
             </TouchableOpacity>
           </View>
@@ -263,6 +301,48 @@ export default function MovieDetailScreen() {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Overview</Text>
               <Text style={styles.overview}>{movie.overview}</Text>
+            </View>
+          )}
+
+          {/* Cast */}
+          {cast && cast.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Cast</Text>
+                {cast.length > 6 && (
+                  <TouchableOpacity onPress={() => setShowAllCast(!showAllCast)}>
+                    <Text style={styles.seeAllText}>
+                      {showAllCast ? 'Show Less' : 'See All'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <View style={styles.castGrid}>
+                {(showAllCast ? cast : cast.slice(0, 6)).map((person) => (
+                  <TouchableOpacity 
+                    key={person.id} 
+                    style={styles.castGridItem}
+                    onPress={() => handlePersonPress(person)}
+                  >
+                    <Image 
+                      source={{ 
+                        uri: person.profile_path 
+                          ? getImageUrl(person.profile_path, 'w185') 
+                          : 'https://via.placeholder.com/150x225/cccccc/666666?text=No+Photo'
+                      }} 
+                      style={styles.castGridImage}
+                      defaultSource={{ uri: 'https://via.placeholder.com/150x225/cccccc/666666?text=Loading' }}
+                      onError={(error) => {
+                        console.log('Image load error for cast member:', person.name, error.nativeEvent.error);
+                      }}
+                    />
+                    <View style={styles.castGridInfo}>
+                      <Text style={styles.castGridName} numberOfLines={1}>{person.name}</Text>
+                      <Text style={styles.castGridCharacter} numberOfLines={1}>{person.character}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
 
@@ -329,27 +409,6 @@ const styles = StyleSheet.create({
     width: screenWidth,
     height: 250,
     resizeMode: 'cover',
-  },
-  headerActions: {
-    position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-  },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rightActions: {
-    flexDirection: 'row',
-    gap: 12,
   },
   content: {
     flex: 1,
@@ -420,7 +479,7 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 1,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#FF6B35',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -441,7 +500,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: '#FF6B35',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -450,7 +509,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 16,
     fontFamily: 'Inter',
-    color: '#3B82F6',
+    color: '#FF6B35',
   },
   section: {
     marginBottom: 24,
@@ -500,5 +559,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter',
     color: '#1F2937',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  seeAllText: {
+    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '600',
+    color: '#FF6B35',
+  },
+  castGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  castGridItem: {
+    width: '48%',
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    gap: 12,
+  },
+  castGridImage: {
+    width: 50,
+    height: 75,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  castGridInfo: {
+    flex: 1,
+  },
+  castGridName: {
+    fontSize: 14,
+    fontFamily: 'Inter',
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  castGridCharacter: {
+    fontSize: 12,
+    fontFamily: 'Inter',
+    color: '#6B7280',
   },
 });

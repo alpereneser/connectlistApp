@@ -357,6 +357,8 @@ export default function ListDetailScreen() {
       router.push('/discover');
     } else if (tab === 'profile') {
       router.push('/profile');
+    } else if (tab === 'notifications') {
+      router.push('/notifications');
     }
   }, [router]);
 

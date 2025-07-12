@@ -23,7 +23,7 @@ export default function AppBar({ title = 'ConnectList', showBackButton = false, 
   return (
     <>
       <StatusBar style="dark" />
-      <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
+      <View style={[styles.container, { paddingTop: insets.top + 24 + (Platform.OS === 'ios' ? 10 : 0) }]}>
         <View style={styles.leftSection}>
           {showBackButton && (
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -65,13 +65,13 @@ export default function AppBar({ title = 'ConnectList', showBackButton = false, 
 
 const styles = StyleSheet.create({
   container: {
-    height: 64 + (Platform.OS === 'ios' ? 44 : 24),
+    height: 64 + (Platform.OS === 'ios' ? 54 : 24),
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingBottom: 16,
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
     shadowColor: '#000',
@@ -95,10 +95,10 @@ const styles = StyleSheet.create({
   },
 
   iconButton: {
-    padding: 8,
+    padding: 0,
   },
   backButton: {
-    padding: 8,
+    padding: 0,
     marginRight: 8,
   },
   title: {

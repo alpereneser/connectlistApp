@@ -3,8 +3,9 @@ import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -39,6 +40,32 @@ export default function RootLayout() {
   useEffect(() => {
     checkAuthAndOnboarding();
   }, []);
+
+  // Handle deep links for OAuth callbacks
+  useEffect(() => {
+    const handleDeepLink = (url: string) => {
+      console.log('Deep link received:', url);
+      
+      if (url.includes('auth/callback')) {
+        // Navigate to auth callback page to handle the OAuth response
+        router.push('/auth/callback');
+      }
+    };
+
+    // Get initial URL (for when app is opened via deep link)
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+
+    // Listen for subsequent deep links (when app is already open)
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
+
+    return () => subscription?.remove();
+  }, [router]);
 
   const checkAuthAndOnboarding = async () => {
     try {
@@ -117,6 +144,7 @@ export default function RootLayout() {
           <Stack.Screen name="auth/register" />
           <Stack.Screen name="auth/email-verification" />
           <Stack.Screen name="auth/forgot-password" />
+          <Stack.Screen name="auth/callback" />
           <Stack.Screen name="onboarding/index" />
           <Stack.Screen name="privacy-policy" />
           <Stack.Screen name="terms-of-service" />

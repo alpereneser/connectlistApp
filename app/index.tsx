@@ -24,6 +24,8 @@ export default function MainApp() {
       router.push('/profile');
     } else if (tab === 'add') {
       router.push('/create');
+    } else if (tab === 'notifications') {
+      router.push('/notifications');
     }
   };
 
@@ -631,12 +633,13 @@ function HomeContent() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgb(245, 245, 245)',
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 10,
+    backgroundColor: 'rgb(245, 245, 245)',
   },
   loadingContainer: {
     flex: 1,
