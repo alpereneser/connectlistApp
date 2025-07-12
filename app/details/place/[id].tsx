@@ -183,50 +183,72 @@ export default function PlaceDetailScreen() {
     }
   };
 
-  const renderImageCarousel = () => {
-    if (!place?.image) {
-      return (
-        <View style={styles.imagePlaceholder}>
-          <MapPin size={48} color="#9CA3AF" />
-          <Text style={styles.imagePlaceholderText}>No images available</Text>
-        </View>
-      );
-    }
-
+  const renderHeroSection = () => {
     return (
-      <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: place.image }} 
-          style={styles.placeImage}
-          resizeMode="cover"
-        />
-        <View style={styles.imageOverlay}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <ArrowLeft size={24} color="#FFFFFF" weight="bold" />
-          </TouchableOpacity>
+      <View style={styles.heroContainer}>
+        {/* Image */}
+        <View style={styles.imageContainer}>
+          {place?.image ? (
+            <Image 
+              source={{ uri: place.image }} 
+              style={styles.heroImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <MapPin size={48} color="#9CA3AF" />
+              <Text style={styles.imagePlaceholderText}>No images available</Text>
+            </View>
+          )}
           
-          <View style={styles.imageActions}>
+          {/* Image Overlay with Back and Actions */}
+          <View style={styles.imageOverlay}>
             <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleShare}
+              style={styles.backButton}
+              onPress={() => router.back()}
             >
-              <Text style={styles.shareButtonText}>Share</Text>
+              <ArrowLeft size={24} color="#FFFFFF" weight="bold" />
             </TouchableOpacity>
             
-            <TouchableOpacity 
-              style={[styles.actionButton, isLiked && styles.likedButton]}
-              onPress={() => setIsLiked(!isLiked)}
-            >
-              <Heart 
-                size={20} 
-                color={isLiked ? "#EF4444" : "#FFFFFF"} 
-                weight={isLiked ? "fill" : "regular"} 
-              />
-            </TouchableOpacity>
+            <View style={styles.imageActions}>
+              <TouchableOpacity 
+                style={styles.overlayActionButton}
+                onPress={handleShare}
+              >
+                <Text style={styles.shareButtonText}>Share</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.overlayActionButton, isLiked && styles.likedButton]}
+                onPress={() => setIsLiked(!isLiked)}
+              >
+                <Heart 
+                  size={20} 
+                  color={isLiked ? "#FF385C" : "#FFFFFF"} 
+                  weight={isLiked ? "fill" : "regular"} 
+                />
+              </TouchableOpacity>
+            </View>
           </View>
+        </View>
+
+        {/* Action Buttons Below Image */}
+        <View style={styles.quickActionsContainer}>
+          <TouchableOpacity 
+            style={styles.primaryActionButton}
+            onPress={handleAddToList}
+          >
+            <Plus size={20} color="#FFFFFF" weight="bold" />
+            <Text style={styles.primaryActionText}>Add to List</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.secondaryActionButton}
+            onPress={handleWhoAddedList}
+          >
+            <Users size={20} color="#FF385C" />
+            <Text style={styles.secondaryActionText}>Who Added This</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -236,97 +258,72 @@ export default function PlaceDetailScreen() {
     if (!place) return null;
 
     return (
-      <View style={styles.infoContainer}>
-        <View style={styles.headerInfo}>
-          <Text style={styles.placeName}>{place.name}</Text>
-          <Text style={styles.placeCategory}>{place.category?.replace(/_/g, ' ')}</Text>
+      <View style={styles.contentContainer}>
+        {/* Header Section */}
+        <View style={styles.headerSection}>
+          <View style={styles.titleSection}>
+            <Text style={styles.placeName}>{place.name}</Text>
+            <Text style={styles.placeCategory}>{place.category?.replace(/_/g, ' ')}</Text>
+          </View>
           
           {place.rating && (
-            <View style={styles.ratingContainer}>
-              <Star size={20} color="#F59E0B" weight="fill" />
+            <View style={styles.ratingBadge}>
+              <Star size={16} color="#FFD700" weight="fill" />
               <Text style={styles.ratingText}>{place.rating.toFixed(1)}</Text>
-              <Text style={styles.ratingSubtext}>Google Rating</Text>
             </View>
           )}
         </View>
 
+        {/* Description */}
         {place.description && (
-          <View style={styles.descriptionContainer}>
+          <View style={styles.descriptionSection}>
             <Text style={styles.descriptionText}>{place.description}</Text>
           </View>
         )}
 
-        <View style={styles.detailsContainer}>
+        {/* Details Cards */}
+        <View style={styles.detailsGrid}>
           {place.address && (
-            <TouchableOpacity 
-              style={styles.detailItem}
-              onPress={handleOpenInMaps}
-            >
-              <MapPin size={20} color="#6B7280" />
-              <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Address</Text>
-                <Text style={styles.detailText}>{place.address}</Text>
+            <TouchableOpacity style={styles.detailCard} onPress={handleOpenInMaps}>
+              <View style={styles.detailCardHeader}>
+                <MapPin size={24} color="#FF385C" />
+                <Text style={styles.detailCardTitle}>Location</Text>
               </View>
-              <MapPin size={16} color="#F97316" />
+              <Text style={styles.detailCardText}>{place.address}</Text>
             </TouchableOpacity>
           )}
 
           {place.phone && (
-            <TouchableOpacity 
-              style={styles.detailItem}
-              onPress={handleCallPhone}
-            >
-              <Phone size={20} color="#6B7280" />
-              <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Phone</Text>
-                <Text style={styles.detailText}>{place.phone}</Text>
+            <TouchableOpacity style={styles.detailCard} onPress={handleCallPhone}>
+              <View style={styles.detailCardHeader}>
+                <Phone size={24} color="#FF385C" />
+                <Text style={styles.detailCardTitle}>Contact</Text>
               </View>
+              <Text style={styles.detailCardText}>{place.phone}</Text>
             </TouchableOpacity>
           )}
 
           {place.website && (
-            <TouchableOpacity 
-              style={styles.detailItem}
-              onPress={handleOpenWebsite}
-            >
-              <Globe size={20} color="#6B7280" />
-              <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Website</Text>
-                <Text style={styles.detailText} numberOfLines={1}>
-                  {place.website.replace(/^https?:\/\//, '')}
-                </Text>
+            <TouchableOpacity style={styles.detailCard} onPress={handleOpenWebsite}>
+              <View style={styles.detailCardHeader}>
+                <Globe size={24} color="#FF385C" />
+                <Text style={styles.detailCardTitle}>Website</Text>
               </View>
+              <Text style={styles.detailCardText} numberOfLines={1}>
+                {place.website.replace(/^https?:\/\//, '')}
+              </Text>
             </TouchableOpacity>
           )}
 
           {place.workingHours && (
-            <View style={styles.detailItem}>
-              <Clock size={20} color="#6B7280" />
-              <View style={styles.detailTextContainer}>
-                <Text style={styles.detailLabel}>Hours</Text>
-                <Text style={styles.detailText}>{place.workingHours}</Text>
+            <View style={styles.detailCard}>
+              <View style={styles.detailCardHeader}>
+                <Clock size={24} color="#FF385C" />
+                <Text style={styles.detailCardTitle}>Hours</Text>
               </View>
+              <Text style={styles.detailCardText}>{place.workingHours}</Text>
             </View>
           )}
-        </View>
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity 
-            style={styles.addToListButtonInline}
-            onPress={handleAddToList}
-          >
-            <Plus size={20} color="#FFFFFF" />
-            <Text style={styles.addToListButtonText}>Add to List</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.whoAddedButton}
-            onPress={handleWhoAddedList}
-          >
-            <Users size={20} color="#F97316" />
-            <Text style={styles.whoAddedButtonText}>Who Added This</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -346,10 +343,8 @@ export default function PlaceDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <AppBar title="Place Details" />
-      
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {renderImageCarousel()}
+        {renderHeroSection()}
         {renderPlaceInfo()}
       </ScrollView>
 
@@ -375,29 +370,35 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6B7280',
+    color: '#717171',
     fontFamily: 'Inter',
+  },
+  
+  // Hero Section
+  heroContainer: {
+    backgroundColor: '#FFFFFF',
   },
   imageContainer: {
     position: 'relative',
-    height: 300,
-    backgroundColor: '#F3F4F6',
+    height: SCREEN_WIDTH * 0.7, // Responsive height
+    backgroundColor: '#F7F7F7',
   },
-  placeImage: {
+  heroImage: {
     width: '100%',
     height: '100%',
   },
   imagePlaceholder: {
-    height: 300,
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#F7F7F7',
   },
   imagePlaceholderText: {
-    marginTop: 8,
-    fontSize: 14,
+    marginTop: 12,
+    fontSize: 16,
     color: '#9CA3AF',
     fontFamily: 'Inter',
+    fontWeight: '500',
   },
   imageOverlay: {
     position: 'absolute',
@@ -408,156 +409,180 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     padding: 20,
-    paddingTop: 60,
+    paddingTop: 50,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   imageActions: {
     flexDirection: 'row',
     gap: 8,
   },
-  actionButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  overlayActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   likedButton: {
-    backgroundColor: 'rgba(239, 68, 68, 0.8)',
+    backgroundColor: 'rgba(255, 56, 92, 0.1)',
   },
-  infoContainer: {
+  shareButtonText: {
+    color: '#222222',
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  
+  // Quick Actions
+  quickActionsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EBEBEB',
+  },
+  primaryActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF385C',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    gap: 8,
+  },
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  secondaryActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+    gap: 8,
+  },
+  secondaryActionText: {
+    color: '#FF385C',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  
+  // Content Container
+  contentContainer: {
     padding: 20,
+    backgroundColor: '#FFFFFF',
   },
-  headerInfo: {
-    marginBottom: 20,
+  
+  // Header Section
+  headerSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  titleSection: {
+    flex: 1,
+    paddingRight: 16,
   },
   placeName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1F2937',
+    fontSize: 26,
+    fontWeight: '600',
+    color: '#222222',
     fontFamily: 'Inter',
     marginBottom: 4,
+    lineHeight: 32,
   },
   placeCategory: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#717171',
     fontFamily: 'Inter',
     textTransform: 'capitalize',
-    marginBottom: 12,
   },
-  ratingContainer: {
+  ratingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    backgroundColor: '#F7F7F7',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
   },
   ratingText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    fontFamily: 'Inter',
-  },
-  ratingSubtext: {
     fontSize: 14,
-    color: '#6B7280',
+    fontWeight: '600',
+    color: '#222222',
     fontFamily: 'Inter',
   },
-  descriptionContainer: {
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+  
+  // Description
+  descriptionSection: {
+    marginBottom: 32,
   },
   descriptionText: {
     fontSize: 16,
-    color: '#4B5563',
+    color: '#222222',
     fontFamily: 'Inter',
     lineHeight: 24,
   },
-  detailsContainer: {
+  
+  // Details Grid
+  detailsGrid: {
     gap: 16,
   },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F9FAFB',
+  detailCard: {
+    backgroundColor: '#F7F7F7',
     borderRadius: 12,
-  },
-  detailTextContainer: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontFamily: 'Inter',
-    fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  detailText: {
-    fontSize: 16,
-    color: '#1F2937',
-    fontFamily: 'Inter',
-  },
-  shareButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'Inter',
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  addToListButtonInline: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F97316',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 8,
-  },
-  addToListButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Inter',
-  },
-  whoAddedButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FEF3E2',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#F97316',
-    gap: 8,
+    borderColor: '#EBEBEB',
   },
-  whoAddedButtonText: {
-    color: '#F97316',
+  detailCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 12,
+  },
+  detailCardTitle: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#222222',
     fontFamily: 'Inter',
+  },
+  detailCardText: {
+    fontSize: 14,
+    color: '#717171',
+    fontFamily: 'Inter',
+    lineHeight: 20,
   },
 });
