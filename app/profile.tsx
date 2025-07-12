@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, Linking, Share, Platform, Modal, FlatList } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import AppBar from '../components/AppBar';
 import BottomMenu from '../components/BottomMenu';
@@ -11,9 +11,10 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface ProfileScreenProps {
   onTabPress?: (tab: string) => void;
+  userId?: string;
 }
 
-export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
+export default function ProfileScreen({ onTabPress, userId: propUserId }: ProfileScreenProps) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('All Lists');
@@ -23,13 +24,18 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
   const [following, setFollowing] = useState<any[]>([]);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [showFollowingModal, setShowFollowingModal] = useState(false);
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const router = useRouter();
+  const searchParams = useLocalSearchParams();
+  const userId = propUserId || (searchParams.userId as string);
 
 
 
   useEffect(() => {
+    setLoading(true);
     fetchUserProfile();
-  }, []);
+  }, [userId]);
 
   const fetchFollowers = async (userId: string) => {
     try {
@@ -107,6 +113,49 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
     }
   };
 
+  const handleFollowToggle = async () => {
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser || !user?.id) return;
+
+      if (isFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from('user_follows')
+          .delete()
+          .eq('follower_id', authUser.id)
+          .eq('following_id', user.id);
+
+        if (!error) {
+          setIsFollowing(false);
+          setUser(prev => ({
+            ...prev,
+            followers_count: Math.max(0, (prev.followers_count || 0) - 1)
+          }));
+        }
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from('user_follows')
+          .insert({
+            follower_id: authUser.id,
+            following_id: user.id
+          });
+
+        if (!error) {
+          setIsFollowing(true);
+          setUser(prev => ({
+            ...prev,
+            followers_count: (prev.followers_count || 0) + 1
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Follow toggle error:', error);
+      Alert.alert('Error', 'Failed to update follow status');
+    }
+  };
+
   const fetchUserProfile = async () => {
     try {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
@@ -116,12 +165,17 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
         return;
       }
       
-      if (authUser) {
+      // Determine which profile to load
+      const profileIdToLoad = userId || authUser?.id;
+      const checkIsOwnProfile = !userId || userId === authUser?.id;
+      setIsOwnProfile(checkIsOwnProfile);
+      
+      if (profileIdToLoad) {
         // Fetch from users_profiles table
         const { data: profileData, error: profileError } = await supabase
           .from('users_profiles')
           .select('*')
-          .eq('id', authUser.id)
+          .eq('id', profileIdToLoad)
           .single();
 
         if (profileError) {
@@ -144,11 +198,23 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
             created_at: profileData.created_at
           });
           
+          // Check if following (only if viewing someone else's profile)
+          if (!checkIsOwnProfile && authUser) {
+            const { data: followData } = await supabase
+              .from('user_follows')
+              .select('id')
+              .eq('follower_id', authUser.id)
+              .eq('following_id', profileIdToLoad)
+              .single();
+            
+            setIsFollowing(!!followData);
+          }
+          
           // Fetch user's lists
           const { data: listsData, error: listsError } = await supabase
             .from('lists')
             .select('*')
-            .eq('creator_id', authUser.id)
+            .eq('creator_id', profileIdToLoad)
             .order('created_at', { ascending: false });
             
           if (listsError) {
@@ -160,10 +226,12 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
           if (listsData && listsData.length > 0) {
             // Fetch categories data separately  
             const categoryNames = [...new Set(listsData.map(list => list.category).filter(Boolean))];
-            const { data: categoriesData } = await supabase
+            console.log('Profile - Category names to fetch:', categoryNames); // Debug log
+            const { data: categoriesData, error: categoriesError } = await supabase
               .from('categories')
               .select('name, display_name')
               .in('name', categoryNames);
+            console.log('Profile - Categories data:', categoriesData, 'Categories error:', categoriesError); // Debug log
 
             // Create lookup map
             const categoriesMap = categoriesData?.reduce((acc, cat) => ({ ...acc, [cat.name]: cat }), {}) || {};
@@ -406,21 +474,32 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
       // TODO: Implement liked lists filtering
       return [];
     }
-    // Filter by category
-    const categoryMap: Record<string, string> = {
-      'Place Lists': 'places',
-      'Movie Lists': 'movies',
-      'TV Show Lists': 'tv_shows',
-      'Book Lists': 'books',
-      'Game Lists': 'games',
-      'Person Lists': 'persons',
+    // Filter by category - check both category field and categories.name field
+    const categoryMap: Record<string, string[]> = {
+      'Place Lists': ['places', 'place'],
+      'Movie Lists': ['movies', 'movie'],
+      'TV Show Lists': ['tv_shows', 'tv_show', 'tv'],
+      'Book Lists': ['books', 'book'],
+      'Game Lists': ['games', 'game'],
+      'Person Lists': ['persons', 'person', 'people'],
     };
-    const categoryFilter = categoryMap[activeCategory];
-    return userLists.filter(list => list.category === categoryFilter);
+    const categoryFilters = categoryMap[activeCategory] || [];
+    
+    return userLists.filter(list => {
+      // Check both list.category and list.categories?.name
+      const listCategory = list.category;
+      const listCategoryName = list.categories?.name;
+      
+      return categoryFilters.some(filter => 
+        filter === listCategory || filter === listCategoryName
+      );
+    });
   }, [userLists, activeCategory]);
 
   // Helper function to get category display name
   const getCategoryDisplayName = (category: string) => {
+    if (!category) return 'General';
+    
     switch (category) {
       case 'movies':
         return 'Movies';
@@ -435,7 +514,8 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
       case 'persons':
         return 'People';
       default:
-        return 'General';
+        // Use the category name with proper formatting if it's not in our predefined list
+        return category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
     }
   };
 
@@ -476,6 +556,131 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
         return '👤';
       default:
         return '📝';
+    }
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return `${diffInSeconds}s`;
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h`;
+    } else if (diffInSeconds < 604800) {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days}d`;
+    } else {
+      const weeks = Math.floor(diffInSeconds / 604800);
+      return `${weeks}w`;
+    }
+  };
+
+  const openYouTubeVideo = async (item: any) => {
+    try {
+      let videoId = null;
+
+      // Try to extract YouTube video ID from external_data
+      if (item.external_data) {
+        if (item.external_data.videoId) {
+          videoId = item.external_data.videoId;
+        } else if (item.external_data.url) {
+          const urlMatch = item.external_data.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+          if (urlMatch && urlMatch[1]) {
+            videoId = urlMatch[1];
+          }
+        }
+      }
+
+      // If we still don't have a video ID, try to extract from content_id
+      if (!videoId && item.content_id) {
+        const urlMatch = item.content_id.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+        if (urlMatch && urlMatch[1]) {
+          videoId = urlMatch[1];
+        } else if (item.content_id.length === 11) {
+          videoId = item.content_id;
+        }
+      }
+
+      if (videoId) {
+        const youtubeAppUrl = `vnd.youtube://${videoId}`;
+        const youtubeWebUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+        const canOpenYouTube = await Linking.canOpenURL(youtubeAppUrl);
+        
+        if (canOpenYouTube) {
+          await Linking.openURL(youtubeAppUrl);
+        } else {
+          await Linking.openURL(youtubeWebUrl);
+        }
+      } else {
+        // Fallback to regular details if no YouTube ID found
+        if (item.content_id && item.content_type) {
+          router.push(`/details/${item.content_type}/${item.content_id}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error opening YouTube video:', error);
+      // Fallback to regular item details
+      if (item.content_id && item.content_type) {
+        router.push(`/details/${item.content_type}/${item.content_id}`);
+      }
+    }
+  };
+
+  const handleItemPress = (item: any, listCategory?: string) => {
+    if (!item.content_id || !item.content_type) {
+      return;
+    }
+
+    // Check if this is a YouTube video
+    const isYouTubeVideo = 
+      listCategory === 'youtube' ||
+      listCategory === 'videos' ||
+      item.content_type === 'video' ||
+      item.external_data?.videoId ||
+      item.external_data?.url?.includes('youtube') ||
+      item.content_id?.includes('youtube') ||
+      (item.content_id?.length === 11);
+
+    if (isYouTubeVideo) {
+      openYouTubeVideo(item);
+      return;
+    }
+
+    // Route to appropriate details page based on content_type
+    switch (item.content_type) {
+      case 'movie':
+        router.push(`/details/movie/${item.content_id}`);
+        break;
+      case 'tv':
+      case 'tv_show':
+        router.push(`/details/tv/${item.content_id}`);
+        break;
+      case 'book':
+        router.push(`/details/book/${item.content_id}`);
+        break;
+      case 'game':
+        router.push(`/details/game/${item.content_id}`);
+        break;
+      case 'place':
+        router.push(`/details/place/${item.content_id}`);
+        break;
+      case 'person':
+        router.push(`/details/person/${item.content_id}`);
+        break;
+      case 'video':
+        openYouTubeVideo(item);
+        break;
+      default:
+        // Fallback to generic details
+        router.push(`/details/${item.content_type}/${item.content_id}`);
+        break;
     }
   };
 
@@ -576,12 +781,29 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
             
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
-              <TouchableOpacity style={styles.editButton} onPress={() => router.push('/settings')}>
-              <Text style={styles.editButtonText}>Edit profile</Text>
-            </TouchableOpacity>
-              <TouchableOpacity style={styles.shareButton} onPress={handleShareProfile}>
-                <Text style={styles.shareButtonText}>Share profile</Text>
-              </TouchableOpacity>
+              {isOwnProfile ? (
+                <>
+                  <TouchableOpacity style={styles.editButton} onPress={() => router.push('/settings')}>
+                    <Text style={styles.editButtonText}>Edit profile</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.shareButton} onPress={handleShareProfile}>
+                    <Text style={styles.shareButtonText}>Share profile</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity 
+                    style={[styles.followButton, isFollowing && styles.followingButton]} 
+                    onPress={handleFollowToggle}
+                  >
+                    <Text style={[styles.followButtonText, isFollowing && styles.followingButtonText]}>                      {isFollowing ? 'Following' : 'Follow'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.shareButton} onPress={handleShareProfile}>
+                    <Text style={styles.shareButtonText}>Share</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
 
@@ -639,8 +861,6 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
                       <View style={styles.listInfo}>
                         <View style={styles.listTitleRow}>
                           <Text style={styles.listAuthorName}>{user?.full_name || user?.username}</Text>
-                          <Text style={styles.listAction}>created</Text>
-                          <Text style={styles.listTitle}>{list.title}</Text>
                         </View>
                         <View style={styles.listMeta}>
                           <Text style={styles.listUsername}>@{user?.username}</Text>
@@ -652,14 +872,20 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
                             </Text>
                           </View>
                           <Text style={styles.separator}>•</Text>
-                          <Text style={styles.listItemCount}>{list.item_count || 0} items</Text>
+                          <Text style={styles.listItemCount}>{getTimeAgo(list.created_at)}</Text>
                         </View>
                       </View>
                     </View>
                   </TouchableOpacity>
                   
+                  <TouchableOpacity onPress={() => router.push(`/list/${list.id}`)}>
+                    <Text style={styles.listTitleMain}>{list.title}</Text>
+                  </TouchableOpacity>
+                  
                   {list.description && (
-                    <Text style={styles.listDescriptionText}>{list.description}</Text>
+                    <Text style={styles.listDescriptionText}>
+                      {list.description.length > 140 ? `${list.description.substring(0, 140)}...` : list.description}
+                    </Text>
                   )}
                   
                   <View style={styles.divider} />
@@ -676,11 +902,7 @@ export default function ProfileScreen({ onTabPress }: ProfileScreenProps) {
                           <TouchableOpacity 
                             key={item.id} 
                             style={styles.listItemCard}
-                            onPress={() => {
-                              if (item.content_id && item.content_type) {
-                                router.push(`/details/${item.content_type}/${item.content_id}`);
-                              }
-                            }}
+                            onPress={() => handleItemPress(item, list.category)}
                           >
                             {item.image_url ? (
                               <Image source={{ uri: item.image_url }} style={styles.itemImage} />
@@ -1191,6 +1413,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#F97316',
   },
+  listTitleMain: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 8,
+    marginTop: 4,
+  },
   listMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1400,6 +1630,27 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#9CA3AF',
     lineHeight: 16,
+  },
+  followButton: {
+    backgroundColor: '#F97316',
+    borderRadius: 10,
+    paddingHorizontal: 47,
+    paddingVertical: 8,
+  },
+  followingButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DDDDDD',
+  },
+  followButtonText: {
+    fontFamily: 'Inter',
+    fontSize: 16,
+    color: '#FFFFFF',
+    lineHeight: 19,
+    textAlign: 'center',
+  },
+  followingButtonText: {
+    color: '#000000',
   },
   modalEmptyState: {
     paddingVertical: 60,

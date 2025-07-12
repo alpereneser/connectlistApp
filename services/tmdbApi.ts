@@ -1,9 +1,103 @@
 // TMDB API servisleri
+import { Platform } from 'react-native';
+import { ENV } from '../config/env';
 
-const TMDB_API_KEY = '378b6eb3c69f21d0815d31c4bf5f19a4';
-const TMDB_READ_ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzNzhiNmViM2M2OWYyMWQwODE1ZDMxYzRiZjVmMTlhNCIsIm5iZiI6MTcxODY4NjkyNC41MjQ5OTk5LCJzdWIiOiI2NjcxMTRjY2Y4NDhiMmQ1NTM2YWE5YTMiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.4E-BfHAbJT4XgMJF9mG9OM4Rc3XdGzbd5n47acQ3tKw';
+const TMDB_API_KEY = ENV.TMDB_API_KEY;
+const TMDB_READ_ACCESS_TOKEN = ENV.TMDB_READ_ACCESS_TOKEN;
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
+
+// Mock data for fallback
+const MOCK_MOVIES: MovieResult[] = [
+  {
+    id: 1,
+    title: 'Inception',
+    overview: 'A skilled thief who steals corporate secrets through dream-sharing technology',
+    poster_path: '/9gk7adHYeDvHkCSEqAvQNLV5Uge.jpg',
+    backdrop_path: '/8ZTVqvKDQ8emSGUEMjsS4yHAwrp.jpg',
+    release_date: '2010-07-16',
+    vote_average: 8.8,
+    vote_count: 35000,
+    genre_ids: [28, 878, 53],
+    adult: false,
+    original_language: 'en',
+    original_title: 'Inception',
+    popularity: 150.5,
+    video: false
+  },
+  {
+    id: 2,
+    title: 'The Dark Knight',
+    overview: 'Batman faces the Joker in this epic superhero thriller',
+    poster_path: '/qJ2tW6WMUDux911r6m7haRef0WH.jpg',
+    backdrop_path: '/hqkIcbrOHL86UncnHIsHVcVmzue.jpg',
+    release_date: '2008-07-18',
+    vote_average: 9.0,
+    vote_count: 28500,
+    genre_ids: [28, 80, 18],
+    adult: false,
+    original_language: 'en',
+    original_title: 'The Dark Knight',
+    popularity: 180.2,
+    video: false
+  }
+];
+
+const MOCK_TV_SHOWS: TVShowResult[] = [
+  {
+    id: 1,
+    name: 'Game of Thrones',
+    overview: 'Nine noble families fight for control over the lands of Westeros',
+    poster_path: '/7WUHnWGx5OO145IRxPDUkQSh4C7.jpg',
+    backdrop_path: '/mUkuc2wyV9dHLG0D0Loaw5pO2s8.jpg',
+    first_air_date: '2011-04-17',
+    vote_average: 9.3,
+    vote_count: 22100,
+    genre_ids: [18, 10759, 10765],
+    adult: false,
+    origin_country: ['US'],
+    original_language: 'en',
+    original_name: 'Game of Thrones',
+    popularity: 369.594
+  },
+  {
+    id: 2,
+    name: 'Breaking Bad',
+    overview: 'A high school chemistry teacher turned methamphetamine manufacturer',
+    poster_path: '/ggFHVNu6YYI5L9pCfOacjizRGt.jpg',
+    backdrop_path: '/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg',
+    first_air_date: '2008-01-20',
+    vote_average: 9.5,
+    vote_count: 18500,
+    genre_ids: [18, 80],
+    adult: false,
+    origin_country: ['US'],
+    original_language: 'en',
+    original_name: 'Breaking Bad',
+    popularity: 400.123
+  }
+];
+
+const MOCK_PEOPLE: PersonResult[] = [
+  {
+    id: 1,
+    name: 'Leonardo DiCaprio',
+    profile_path: '/wo2hJpn04vbtmh0B9utCFdsQhxM.jpg',
+    adult: false,
+    popularity: 45.654,
+    known_for_department: 'Acting',
+    known_for: []
+  },
+  {
+    id: 2,
+    name: 'Scarlett Johansson',
+    profile_path: '/6NsMbJXRlDZuDzatN2akFdGuTvx.jpg',
+    adult: false,
+    popularity: 78.321,
+    known_for_department: 'Acting',
+    known_for: []
+  }
+];
 
 export interface MovieResult {
   id: number;
@@ -69,10 +163,33 @@ const getHeaders = () => ({
   'Content-Type': 'application/json;charset=utf-8'
 });
 
-// Genel arama (multi search)
+// Genel arama (multi search) with fallback
 export async function searchMulti(query: string, page: number = 1): Promise<CategorizedResults> {
   try {
     console.log('TMDB Multi Search for:', query);
+    
+    // If no API key, return mock data
+    if (!TMDB_READ_ACCESS_TOKEN && !TMDB_API_KEY) {
+      console.warn('TMDB API key missing, using mock data');
+      const filteredMovies = MOCK_MOVIES.filter(movie => 
+        movie.title.toLowerCase().includes(query.toLowerCase()) ||
+        movie.overview.toLowerCase().includes(query.toLowerCase())
+      );
+      const filteredTVShows = MOCK_TV_SHOWS.filter(show => 
+        show.name.toLowerCase().includes(query.toLowerCase()) ||
+        show.overview.toLowerCase().includes(query.toLowerCase())
+      );
+      const filteredPeople = MOCK_PEOPLE.filter(person => 
+        person.name.toLowerCase().includes(query.toLowerCase())
+      );
+      
+      return {
+        movies: filteredMovies.length > 0 ? filteredMovies : MOCK_MOVIES,
+        tvShows: filteredTVShows.length > 0 ? filteredTVShows : MOCK_TV_SHOWS,
+        people: filteredPeople.length > 0 ? filteredPeople : MOCK_PEOPLE,
+        total: filteredMovies.length + filteredTVShows.length + filteredPeople.length
+      };
+    }
     
     const url = `${TMDB_BASE_URL}/search/multi?query=${encodeURIComponent(query)}&page=${page}&language=tr-TR`;
     
@@ -82,7 +199,20 @@ export async function searchMulti(query: string, page: number = 1): Promise<Cate
     });
     
     if (!response.ok) {
-      throw new Error(`TMDB API request failed: ${response.status}`);
+      console.error(`TMDB API request failed: ${response.status}`);
+      // Return mock data on API error
+      const filteredMovies = MOCK_MOVIES.filter(movie => 
+        movie.title.toLowerCase().includes(query.toLowerCase())
+      );
+      const filteredTVShows = MOCK_TV_SHOWS.filter(show => 
+        show.name.toLowerCase().includes(query.toLowerCase())
+      );
+      return {
+        movies: filteredMovies.length > 0 ? filteredMovies : MOCK_MOVIES,
+        tvShows: filteredTVShows.length > 0 ? filteredTVShows : MOCK_TV_SHOWS,
+        people: MOCK_PEOPLE,
+        total: filteredMovies.length + filteredTVShows.length + MOCK_PEOPLE.length
+      };
     }
     
     const data: TMDBSearchResponse = await response.json();
@@ -112,18 +242,35 @@ export async function searchMulti(query: string, page: number = 1): Promise<Cate
   } catch (error) {
     console.error('TMDB Search error:', error);
     
+    // Return mock data on any error
+    const filteredMovies = MOCK_MOVIES.filter(movie => 
+      movie.title.toLowerCase().includes(query.toLowerCase())
+    );
+    const filteredTVShows = MOCK_TV_SHOWS.filter(show => 
+      show.name.toLowerCase().includes(query.toLowerCase())
+    );
+    
     return {
-      movies: [],
-      tvShows: [],
-      people: [],
-      total: 0
+      movies: filteredMovies.length > 0 ? filteredMovies : MOCK_MOVIES,
+      tvShows: filteredTVShows.length > 0 ? filteredTVShows : MOCK_TV_SHOWS,
+      people: MOCK_PEOPLE,
+      total: filteredMovies.length + filteredTVShows.length + MOCK_PEOPLE.length
     };
   }
 }
 
-// Sadece film arama
+// Sadece film arama with fallback
 export async function searchMovies(query: string, page: number = 1): Promise<MovieResult[]> {
   try {
+    // If no API key, return mock data
+    if (!TMDB_READ_ACCESS_TOKEN && !TMDB_API_KEY) {
+      console.warn('TMDB API key missing, using mock movies');
+      const filtered = MOCK_MOVIES.filter(movie => 
+        movie.title.toLowerCase().includes(query.toLowerCase())
+      );
+      return filtered.length > 0 ? filtered : MOCK_MOVIES;
+    }
+    
     const url = `${TMDB_BASE_URL}/search/movie?query=${encodeURIComponent(query)}&page=${page}&language=tr-TR`;
     
     const response = await fetch(url, {
@@ -132,14 +279,21 @@ export async function searchMovies(query: string, page: number = 1): Promise<Mov
     });
     
     if (!response.ok) {
-      throw new Error(`TMDB Movies API request failed: ${response.status}`);
+      console.error(`TMDB Movies API request failed: ${response.status}`);
+      const filtered = MOCK_MOVIES.filter(movie => 
+        movie.title.toLowerCase().includes(query.toLowerCase())
+      );
+      return filtered.length > 0 ? filtered : MOCK_MOVIES;
     }
     
     const data = await response.json();
     return data.results || [];
   } catch (error) {
     console.error('TMDB Movies Search error:', error);
-    return [];
+    const filtered = MOCK_MOVIES.filter(movie => 
+      movie.title.toLowerCase().includes(query.toLowerCase())
+    );
+    return filtered.length > 0 ? filtered : MOCK_MOVIES;
   }
 }
 

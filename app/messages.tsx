@@ -56,6 +56,8 @@ export default function MessagesScreen() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'conversations' | 'people'>('conversations');
+  const [people, setPeople] = useState<any[]>([]);
+  const [peopleLoading, setPeopleLoading] = useState(true);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -315,37 +317,36 @@ export default function MessagesScreen() {
     </ScrollView>
   );
 
-  const renderPeople = () => {
-    // Real people data from Supabase
-    const [people, setPeople] = useState<any[]>([]);
-    const [peopleLoading, setPeopleLoading] = useState(true);
+  const fetchPeople = async () => {
+    try {
+      setPeopleLoading(true);
+      const { data, error } = await supabase
+        .from('users_profiles')
+        .select('id, full_name, username, avatar_url, followers_count')
+        .neq('id', currentUser?.id)
+        .limit(50);
 
-    useEffect(() => {
-      fetchPeople();
-    }, []);
-
-    const fetchPeople = async () => {
-      try {
-        setPeopleLoading(true);
-        const { data, error } = await supabase
-          .from('users_profiles')
-          .select('id, full_name, username, avatar_url, followers_count')
-          .neq('id', currentUser?.id)
-          .limit(50);
-
-        if (error) {
-          console.error('Error fetching people:', error);
-          setPeople([]);
-        } else {
-          setPeople(data || []);
-        }
-      } catch (error) {
+      if (error) {
         console.error('Error fetching people:', error);
         setPeople([]);
-      } finally {
-        setPeopleLoading(false);
+      } else {
+        setPeople(data || []);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching people:', error);
+      setPeople([]);
+    } finally {
+      setPeopleLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'people' && currentUser) {
+      fetchPeople();
+    }
+  }, [activeTab, currentUser]);
+
+  const renderPeople = () => {
 
     const filteredPeople = people.filter(person =>
       person.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||

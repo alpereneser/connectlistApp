@@ -12,7 +12,7 @@
     "primaryColor": "#F97316",
     "backgroundColor": "#FFFFFF",
     "privacy": "public",
-    "owner": "connectlist",
+    "owner": "alperen_eser",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.connectlist.app",
@@ -22,7 +22,9 @@
         "NSPhotoLibraryUsageDescription": "ConnectList accesses your photo library to select images for your profile and lists.",
         "NSFaceIDUsageDescription": "ConnectList uses Face ID for secure authentication."
       },
-      "associatedDomains": ["applinks:connectlist.me"]
+      "associatedDomains": [
+        "applinks:connectlist.me"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -37,7 +39,8 @@
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "VIBRATE"
       ],
       "intentFilters": [
         {
@@ -49,7 +52,10 @@
               "host": "connectlist.me"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -57,7 +63,15 @@
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png",
-      "css": ["./styles/fonts.css"]
+      "css": [
+        "./styles/fonts.css"
+      ],
+      "scripts": [
+        {
+          "src": "https://maps.googleapis.com/maps/api/js?key=AIzaSyCEQZ1ri472vtTCiexDsriTKZTIPQoRJkY&libraries=places",
+          "async": true
+        }
+      ]
     },
     "fonts": [
       "https://fonts.googleapis.com/css2?family=Inter:wght@100;300;400;500;600;700;800;900&display=swap"
@@ -72,10 +86,26 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#F97316",
+          "sounds": [
+            "./assets/sounds/notification.wav"
+          ]
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7022670c-764b-4e3a-83ef-765c806f5cf8"
+      },
+      "router": {}
     }
   }
 }

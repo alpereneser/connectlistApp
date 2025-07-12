@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Email Change - ConnectList</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f8fc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            border-radius: 16px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .content h2 {
+            color: #1f2937;
+            font-size: 24px;
+            margin: 0 0 20px 0;
+            font-weight: 600;
+        }
+        .content p {
+            color: #6b7280;
+            font-size: 16px;
+            margin: 0 0 20px 0;
+        }
+        .email-change-card {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border: 1px solid #93c5fd;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+        }
+        .email-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 12px;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+        }
+        .email-label {
+            font-weight: 600;
+            color: #1e40af;
+            font-size: 14px;
+        }
+        .email-value {
+            color: #1f2937;
+            font-size: 16px;
+            font-family: monospace;
+            background-color: #f3f4f6;
+            padding: 6px 12px;
+            border-radius: 6px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .warning-box {
+            background-color: #fef2f2;
+            border: 1px solid #fca5a5;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .warning-box h4 {
+            color: #dc2626;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        .warning-box p {
+            margin: 0;
+            color: #7f1d1d;
+            font-size: 14px;
+        }
+        .info-box {
+            background-color: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .info-box h4 {
+            color: #0284c7;
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+        .info-box ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #0c4a6e;
+        }
+        .info-box li {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 0;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .footer a {
+            color: #3B82F6;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .header, .content, .footer {
+                padding: 30px 20px;
+            }
+            .email-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://ikalabbzbdbfuxpbiazz.supabase.co/storage/v1/object/public/images//splash-icon.png" alt="ConnectList Logo" class="logo">
+            <h1>Confirm Email Change</h1>
+            <p>Verify your new email address</p>
+        </div>
+        
+        <div class="content">
+            <h2>Confirm Change of Email</h2>
+            <p>Hello! You recently requested to change the email address associated with your ConnectList account.</p>
+            
+            <div class="email-change-card">
+                <h4 style="color: #1e40af; margin: 0 0 15px 0;">📧 Email Change Request</h4>
+                <div class="email-row">
+                    <span class="email-label">From:</span>
+                    <span class="email-value">{{ .Email }}</span>
+                </div>
+                <div class="email-row">
+                    <span class="email-label">To:</span>
+                    <span class="email-value">{{ .NewEmail }}</span>
+                </div>
+            </div>
+            
+            <p>To complete this change and secure your account, please click the button below to confirm your new email address:</p>
+            
+            <a href="{{ .ConfirmationURL }}" class="cta-button">Change Email</a>
+            
+            <div class="info-box">
+                <h4>ℹ️ What happens next?</h4>
+                <ul>
+                    <li>Your email will be updated to the new address</li>
+                    <li>Future notifications will be sent to the new email</li>
+                    <li>You'll use the new email for logging in</li>
+                    <li>The old email will no longer be associated with your account</li>
+                </ul>
+            </div>
+            
+            <div class="warning-box">
+                <h4>⚠️ Important Security Notice</h4>
+                <p>If you didn't request this email change, please <strong>do not click the button above</strong>. Instead, immediately log into your account and check your security settings, or contact our support team.</p>
+            </div>
+            
+            <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #3B82F6; font-size: 14px; background-color: #f8fafc; padding: 10px; border-radius: 6px;">{{ .ConfirmationURL }}</p>
+            
+            <p><em>This confirmation link will expire in 24 hours for security reasons.</em></p>
+        </div>
+        
+        <div class="footer">
+            <p>Need help? Contact our support team at <a href="mailto:support@connectlist.com">support@connectlist.com</a></p>
+            <p>© 2024 ConnectList. All rights reserved.</p>
+            <p><a href="#">Privacy Policy</a> • <a href="#">Terms of Service</a> • <a href="#">Security</a></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,7 +1,7 @@
-// Yandex API servisleri
+// Yandex API servisleri (artık kullanılmıyor - Google Maps'e geçildi)
 
-const YANDEX_PLACE_API_KEY = '5aa5fbc3-04fe-42e3-b60a-1bbcc424b887';
-const YANDEX_GEOCODER_API_KEY = 'f48f98ab-7906-4d87-9796-cca6191eb9d5';
+const YANDEX_PLACE_API_KEY = process.env.EXPO_PUBLIC_YANDEX_PLACE_API_KEY || '';
+const YANDEX_GEOCODER_API_KEY = process.env.EXPO_PUBLIC_YANDEX_GEOCODER_API_KEY || '';
 
 export interface PlaceResult {
   id: string;

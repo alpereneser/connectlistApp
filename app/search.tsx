@@ -5,11 +5,15 @@ import { useRouter } from 'expo-router';
 import AppBar from '../components/AppBar';
 import BottomMenu from '../components/BottomMenu';
 import { fontConfig } from '../styles/global';
-import { MagnifyingGlass, MapPin, Star, Clock, FilmStrip, Television, User, GameController, Book } from 'phosphor-react-native';
-import { searchPlaces, PlaceResult, POPULAR_CATEGORIES } from '../services/yandexApi';
+import { MagnifyingGlass, MapPin, Star, Clock, FilmStrip, Television, User, GameController, Book, Users } from 'phosphor-react-native';
+import { searchPlaces, discoverPlaces, PlaceResult } from '../services/googleMapsApi';
 import { searchMulti, CategorizedResults, MovieResult, TVShowResult, PersonResult, getImageUrl, TMDB_CATEGORIES } from '../services/tmdbApi';
 import { searchGames, getGameImageUrl, RAWG_CATEGORIES, GameResult, formatGameReleaseDate, getPlatformNames } from '../services/rawgApi';
 import { searchBooks, getBookImageUrl, GOOGLE_BOOKS_CATEGORIES, BookResult, formatBookPublicationDate, getAuthorsString } from '../services/googleBooksApi';
+import { searchUsers, UserSearchResult, getUserAvatarUrl, debugGetAllUsers } from '../services/userSearchApi';
+import { POPULAR_CATEGORIES } from '../services/yandexApi';
+import { logAPIStatus, getEnvironmentVariablesStatus } from '../services/apiStatusCheck';
+import { logEnvironmentStatus } from '../config/env';
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -18,9 +22,10 @@ export default function SearchScreen() {
   const [tmdbResults, setTmdbResults] = useState<CategorizedResults>({ movies: [], tvShows: [], people: [], total: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<'all' | 'places' | 'movies' | 'tv' | 'people' | 'games' | 'books'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'places' | 'movies' | 'tv' | 'people' | 'games' | 'books' | 'users'>('all');
   const [gameResults, setGameResults] = useState<GameResult[]>([]);
   const [bookResults, setBookResults] = useState<BookResult[]>([]);
+  const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
   
   // Discover states
   const [discoverData, setDiscoverData] = useState({
@@ -29,7 +34,8 @@ export default function SearchScreen() {
     tvShows: [] as TVShowResult[],
     people: [] as PersonResult[],
     games: [] as GameResult[],
-    books: [] as BookResult[]
+    books: [] as BookResult[],
+    users: [] as UserSearchResult[]
   });
   const [isLoadingDiscover, setIsLoadingDiscover] = useState(false);
 
@@ -49,14 +55,27 @@ export default function SearchScreen() {
 
   // Load discover content on component mount and when active category changes
   useEffect(() => {
+    // Log API status for debugging
+    console.log('=== 🔧 SEARCH PAGE DEBUG ===');
+    logEnvironmentStatus();
+    logAPIStatus();
+    
+    // Debug environment variables
+    const envVars = getEnvironmentVariablesStatus();
+    console.log('Legacy Environment Variables Status:', envVars);
+    console.log('================================');
+    
     loadDiscoverContent();
+    // Debug: List all users when component mounts
+    debugGetAllUsers();
   }, [activeCategory]);
 
   const loadDiscoverContent = async () => {
+    console.log('🔍 Loading discover content...');
     setIsLoadingDiscover(true);
     try {
-      // Random search terms for varied content
-      const placeTerms = ['restaurant', 'cafe', 'hotel', 'park', 'museum', 'shopping', 'bar', 'gym', 'hospital', 'bank', 'library', 'pharmacy', 'cinema', 'theater', 'stadium', 'airport', 'school', 'market', 'bakery', 'gallery'];
+      // Random search terms for varied content - Places focused on entertainment, games and social venues
+      const placeTerms = ['restaurant', 'cafe', 'bar', 'cinema', 'theater', 'bowling', 'karaoke', 'club', 'pub', 'arcade', 'casino', 'billiard', 'game center', 'entertainment', 'nightclub', 'lounge', 'sports bar', 'comedy club', 'dance club', 'social club'];
       const movieTerms = ['action', 'comedy', 'drama', 'thriller', 'adventure', 'romance', 'sci-fi', 'horror', 'animation', 'documentary', 'fantasy', 'crime', 'war', 'western', 'musical', 'biography', 'mystery', 'family', 'superhero', 'indie'];
       const gameTerms = ['action', 'adventure', 'rpg', 'strategy', 'racing', 'sports', 'indie', 'puzzle', 'shooter', 'platformer', 'simulation', 'fighting', 'horror', 'arcade', 'casual', 'mmorpg', 'survival', 'sandbox', 'rhythm', 'card'];
       const bookTerms = ['fiction', 'mystery', 'romance', 'thriller', 'science', 'history', 'biography', 'fantasy', 'horror', 'business', 'self-help', 'cooking', 'travel', 'poetry', 'philosophy', 'psychology', 'health', 'technology', 'art', 'education'];
@@ -68,29 +87,39 @@ export default function SearchScreen() {
       const randomBook = bookTerms[Math.floor(Math.random() * bookTerms.length)];
       
       // Load random content from all categories
-      const [placesResponse, tmdbResponse, gamesResponse, booksResponse] = await Promise.all([
-        searchPlaces(randomPlace),
+      const [placesResponse, tmdbResponse, gamesResponse, booksResponse, usersResponse] = await Promise.all([
+        discoverPlaces(), // Get popular places from Google Maps API
         searchMulti(randomMovie),
         searchGames(randomGame),
-        searchBooks(randomBook)
+        searchBooks(randomBook),
+        searchUsers('a') // Get some random users
       ]);
       
-      // Randomize slice positions for variety
-      const placeStart = Math.floor(Math.random() * Math.max(1, placesResponse.results.length - 6));
-      const movieStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.movies.length - 6));
-      const tvStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.tvShows.length - 6));
-      const peopleStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.people.length - 6));
-      const gameStart = Math.floor(Math.random() * Math.max(1, (gamesResponse.results?.length || 0) - 6));
-      const bookStart = Math.floor(Math.random() * Math.max(1, (booksResponse.items?.length || 0) - 6));
+      // Randomize slice positions for variety - Show at least 10 items per category
+      const placeStart = Math.floor(Math.random() * Math.max(1, placesResponse.results.length - 10));
+      const movieStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.movies.length - 10));
+      const tvStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.tvShows.length - 10));
+      const peopleStart = Math.floor(Math.random() * Math.max(1, tmdbResponse.people.length - 10));
+      const gameStart = Math.floor(Math.random() * Math.max(1, (gamesResponse.results?.length || 0) - 10));
+      const bookStart = Math.floor(Math.random() * Math.max(1, (booksResponse.items?.length || 0) - 10));
       
+      console.log('📍 Places response:', placesResponse.results.length, 'places');
+      console.log('🎬 TMDB response:', tmdbResponse.movies.length, 'movies');
+      console.log('🎮 Games response:', gamesResponse.results?.length || 0, 'games');
+      console.log('📚 Books response:', booksResponse.items?.length || 0, 'books');
+      console.log('👥 Users response:', usersResponse.users?.length || 0, 'users');
+
       setDiscoverData({
-        places: placesResponse.results.slice(placeStart, placeStart + 6),
-        movies: tmdbResponse.movies.slice(movieStart, movieStart + 6),
-        tvShows: tmdbResponse.tvShows.slice(tvStart, tvStart + 6),
-        people: tmdbResponse.people.slice(peopleStart, peopleStart + 6),
-        games: gamesResponse.results?.slice(gameStart, gameStart + 6) || [],
-        books: booksResponse.items?.slice(bookStart, bookStart + 6) || []
+        places: placesResponse.results.slice(placeStart, placeStart + 10),
+        movies: tmdbResponse.movies.slice(movieStart, movieStart + 10),
+        tvShows: tmdbResponse.tvShows.slice(tvStart, tvStart + 10),
+        people: tmdbResponse.people.slice(peopleStart, peopleStart + 10),
+        games: gamesResponse.results?.slice(gameStart, gameStart + 10) || [],
+        books: booksResponse.items?.slice(bookStart, bookStart + 10) || [],
+        users: usersResponse.users.slice(0, 10) || []
       });
+      
+      console.log('✅ Discover content loaded successfully');
     } catch (error) {
       console.error('Discover content load error:', error);
     } finally {
@@ -101,7 +130,7 @@ export default function SearchScreen() {
   const handlePlacePress = (place: PlaceResult) => {
     // Place verisini query parametresi olarak geçir
     const placeData = encodeURIComponent(JSON.stringify(place));
-    router.push(`/details/${place.id}?data=${placeData}`);
+    router.push(`/details/place/${place.id}?data=${placeData}`);
   };
 
   const handleSearch = async (query: string) => {
@@ -110,31 +139,45 @@ export default function SearchScreen() {
       setTmdbResults({ movies: [], tvShows: [], people: [], total: 0 });
       setGameResults([]);
       setBookResults([]);
+      setUserResults([]);
       setHasSearched(false);
       return;
     }
 
+    console.log('🔍 Searching for:', query);
     setIsLoading(true);
     setHasSearched(true);
     
     try {
-      // Paralel olarak mekan, TMDB, RAWG ve Google Books araması yap
-      const [placesResponse, tmdbResponse, gamesResponse, booksResponse] = await Promise.all([
+      // Paralel olarak mekan, TMDB, RAWG, Google Books ve kullanıcı araması yap
+      const [placesResponse, tmdbResponse, gamesResponse, booksResponse, usersResponse] = await Promise.all([
         searchPlaces(query),
         searchMulti(query),
         searchGames(query),
-        searchBooks(query)
+        searchBooks(query),
+        searchUsers(query)
       ]);
+      
+      console.log('📍 Search Places:', placesResponse.results.length);
+      console.log('🎬 Search TMDB:', tmdbResponse.movies.length, 'movies');
+      console.log('🎮 Search Games:', gamesResponse.results?.length || 0);
+      console.log('📚 Search Books:', booksResponse.items?.length || 0);
+      console.log('👥 Search Users:', usersResponse.users?.length || 0);
       
       setSearchResults(placesResponse.results);
       setTmdbResults(tmdbResponse);
       setGameResults(gamesResponse.results || []);
       setBookResults(booksResponse.items || []);
+      setUserResults(usersResponse.users || []);
+      
+      console.log('✅ Search completed successfully');
     } catch (error) {
       console.error('Arama hatası:', error);
       setSearchResults([]);
       setTmdbResults({ movies: [], tvShows: [], people: [], total: 0 });
       setGameResults([]);
+      setBookResults([]);
+      setUserResults([]);
     } finally {
       setIsLoading(false);
     }
@@ -175,6 +218,10 @@ export default function SearchScreen() {
   const handleBookPress = (book: BookResult) => {
     const bookData = encodeURIComponent(JSON.stringify({ ...book, type: 'book' }));
     router.push(`/details/book/${book.id}?data=${bookData}`);
+  };
+
+  const handleUserPress = (user: UserSearchResult) => {
+    router.push(`/user/${user.id}`);
   };
 
   const [failedImages, setFailedImages] = React.useState<Set<string>>(new Set());
@@ -408,11 +455,45 @@ export default function SearchScreen() {
      );
    };
 
+   const renderUserItem = (user: UserSearchResult) => {
+     const avatarUrl = getUserAvatarUrl(user.avatar_url);
+     
+     return (
+       <TouchableOpacity 
+         key={`user-${user.id}`} 
+         style={styles.mediaItem}
+         onPress={() => handleUserPress(user)}
+       >
+         <View style={styles.userImageContainer}>
+           {avatarUrl ? (
+             <Image 
+               source={{ uri: avatarUrl }} 
+               style={styles.userImage}
+               resizeMode="cover"
+             />
+           ) : (
+             <View style={styles.placeholderUserImage}>
+               <User size={24} color="#9CA3AF" />
+             </View>
+           )}
+         </View>
+         <View style={styles.mediaInfo}>
+           <Text style={styles.mediaTitle} numberOfLines={1}>{user.full_name}</Text>
+           <Text style={styles.mediaSubtitle}>@{user.username}</Text>
+           {user.bio && (
+             <Text style={styles.userBio} numberOfLines={2}>{user.bio}</Text>
+           )}
+         </View>
+       </TouchableOpacity>
+     );
+   };
+
   const renderCategoryFilter = () => (
     <View style={styles.categoryFilterContainer}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         {[
           { key: 'all', label: 'All', icon: MagnifyingGlass },
+          { key: 'users', label: 'Users', icon: Users },
           { key: 'places', label: 'Places', icon: MapPin },
           { key: 'movies', label: 'Movies', icon: FilmStrip },
           { key: 'tv', label: 'TV Shows', icon: Television },
@@ -480,7 +561,7 @@ export default function SearchScreen() {
           <Text style={styles.discoverTitle}>{title}</Text>
           {viewAllAction && (
             <TouchableOpacity onPress={viewAllAction}>
-              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={styles.viewAllText}>View More</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -493,11 +574,41 @@ export default function SearchScreen() {
     );
   };
 
+  const handleViewAllPlaces = () => {
+    setSearchQuery('entertainment');
+    handleSearch('entertainment');
+  };
+
+  const handleViewAllMovies = () => {
+    setSearchQuery('popular movies');
+    handleSearch('popular movies');
+  };
+
+  const handleViewAllTVShows = () => {
+    setSearchQuery('popular tv shows');
+    handleSearch('popular tv shows');
+  };
+
+  const handleViewAllGames = () => {
+    setSearchQuery('popular games');
+    handleSearch('popular games');
+  };
+
+  const handleViewAllBooks = () => {
+    setSearchQuery('bestseller books');
+    handleSearch('bestseller books');
+  };
+
+  const handleViewAllUsers = () => {
+    setSearchQuery('user');
+    handleSearch('user');
+  };
+
   const renderDiscoverContent = () => {
     if (isLoadingDiscover) {
       return (
         <View style={styles.discoverLoadingContainer}>
-          <ActivityIndicator size="large" color="#3B82F6" />
+          <ActivityIndicator size="large" color="#F97316" />
           <Text style={styles.loadingText}>Loading discover content...</Text>
         </View>
       );
@@ -538,7 +649,8 @@ export default function SearchScreen() {
                 </View>
               )}
             </TouchableOpacity>
-          )
+          ),
+          handleViewAllPlaces
         )}
         
         {renderDiscoverSection(
@@ -574,7 +686,8 @@ export default function SearchScreen() {
                 </View>
               )}
             </TouchableOpacity>
-          )
+          ),
+          handleViewAllMovies
         )}
         
         {renderDiscoverSection(
@@ -610,7 +723,8 @@ export default function SearchScreen() {
                 </View>
               )}
             </TouchableOpacity>
-          )
+          ),
+          handleViewAllTVShows
         )}
         
         {renderDiscoverSection(
@@ -646,7 +760,8 @@ export default function SearchScreen() {
                 </View>
               )}
             </TouchableOpacity>
-          )
+          ),
+          handleViewAllGames
         )}
         
         {renderDiscoverSection(
@@ -682,7 +797,37 @@ export default function SearchScreen() {
                 </View>
               )}
             </TouchableOpacity>
-          )
+          ),
+          handleViewAllBooks
+        )}
+        
+        {renderDiscoverSection(
+          "Suggested Users",
+          discoverData.users,
+          (user) => (
+            <TouchableOpacity 
+              key={`discover-user-${user.id}`} 
+              style={styles.discoverCard}
+              onPress={() => handleUserPress(user)}
+            >
+              <View style={styles.discoverUserImageContainer}>
+                {getUserAvatarUrl(user.avatar_url) ? (
+                  <Image 
+                    source={{ uri: getUserAvatarUrl(user.avatar_url) }} 
+                    style={styles.discoverUserImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.discoverUserPlaceholder}>
+                    <User size={32} color="#9CA3AF" />
+                  </View>
+                )}
+              </View>
+              <Text style={styles.discoverCardTitle} numberOfLines={1}>{user.full_name}</Text>
+              <Text style={styles.discoverCardSubtitle} numberOfLines={1}>@{user.username}</Text>
+            </TouchableOpacity>
+          ),
+          handleViewAllUsers
         )}
       </View>
     );
@@ -697,8 +842,8 @@ export default function SearchScreen() {
             <MagnifyingGlass size={20} color="#9CA3AF" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search places, restaurants, cafes..."
-            placeholderTextColor="#9CA3AF"
+              placeholder="Search by name, username, places, movies, books..."
+              placeholderTextColor="#9CA3AF"
               value={String(searchQuery || '')}
               onChangeText={(text) => setSearchQuery(String(text || ''))}
               onSubmitEditing={() => handleSearch(String(searchQuery || ''))}
@@ -720,15 +865,21 @@ export default function SearchScreen() {
               <ActivityIndicator size="large" color="#F97316" />
               <Text style={styles.loadingText}>Searching...</Text>
             </View>
-          ) : (searchResults.length > 0 || tmdbResults.total > 0) ? (
+          ) : (searchResults.length > 0 || tmdbResults.total > 0 || gameResults.length > 0 || bookResults.length > 0 || userResults.length > 0) ? (
             <>
               {renderCategoryFilter()}
               <View style={styles.resultsListContainer}>
                 <Text style={styles.resultsHeader}>
-                  {String((searchResults.length + tmdbResults.total + gameResults.length + bookResults.length) || 0)} results found
+                  {String((searchResults.length + tmdbResults.total + gameResults.length + bookResults.length + userResults.length) || 0)} results found
                 </Text>
                 {activeCategory === 'all' ? (
                   <>
+                    {userResults.length > 0 && (
+                      <View style={styles.categorySection}>
+                        <Text style={styles.categorySectionTitle}>Users</Text>
+                        {userResults.map(renderUserItem)}
+                      </View>
+                    )}
                     {searchResults.length > 0 && (
                       <View style={styles.categorySection}>
                         <Text style={styles.categorySectionTitle}>Places</Text>
@@ -774,6 +925,7 @@ export default function SearchScreen() {
                     {activeCategory === 'people' && tmdbResults.people.map(renderPersonItem)}
                     {activeCategory === 'games' && gameResults.map(renderGameItem)}
                     {activeCategory === 'books' && bookResults.map(renderBookItem)}
+                    {activeCategory === 'users' && userResults.map(renderUserItem)}
                   </>
                 )}
               </View>
@@ -1155,5 +1307,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
+  },
+  // User styles
+  userImageContainer: {
+    marginRight: 12,
+  },
+  userImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  placeholderUserImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userBio: {
+    fontSize: 12,
+    fontFamily: 'Inter',
+    color: '#6B7280',
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  discoverUserImageContainer: {
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  discoverUserImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  discoverUserPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

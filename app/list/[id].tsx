@@ -17,6 +17,7 @@ import {
   FlatList,
   PanResponder,
   Animated,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { 
@@ -53,7 +54,7 @@ import BottomMenu from '../../components/BottomMenu';
 import { fontConfig } from '../../styles/global';
 import { supabase } from '../../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { searchPlaces, PlaceResult } from '../../services/yandexApi';
+import { searchPlaces, PlaceResult } from '../../services/googleMapsApi';
 import { searchMulti, MovieResult, TVShowResult, PersonResult, getImageUrl } from '../../services/tmdbApi';
 import { searchGames, GameResult, getGameImageUrl } from '../../services/rawgApi';
 import { searchBooks, BookResult, getBookImageUrl } from '../../services/googleBooksApi';
@@ -98,6 +99,7 @@ interface ListItem {
   likes_count: number;
   comments_count: number;
   shares_count: number;
+  external_data?: any;
 }
 
 interface Comment {
@@ -292,7 +294,7 @@ export default function ListDetailScreen() {
 
         setListDetail(enrichedList);
 
-        // Fetch list items
+        // Fetch list items with external_data
         const { data: itemsData, error: itemsError } = await supabase
           .from('list_items')
           .select('*')
@@ -912,6 +914,115 @@ export default function ListDetailScreen() {
       Alert.alert('Error', 'Failed to update follow status');
     } finally {
       setFollowLoading(false);
+    }
+  };
+
+  const openYouTubeVideo = async (item: ListItem) => {
+    try {
+      let videoId = null;
+      let videoUrl = null;
+
+      // Try to extract YouTube video ID from external_data
+      if (item.external_data) {
+        // If it's a YouTube video from the external_data
+        if (item.external_data.videoId) {
+          videoId = item.external_data.videoId;
+        } else if (item.external_data.url) {
+          // Extract video ID from YouTube URL
+          const urlMatch = item.external_data.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+          if (urlMatch && urlMatch[1]) {
+            videoId = urlMatch[1];
+          }
+        }
+      }
+
+      // If we still don't have a video ID, try to extract from content_id
+      if (!videoId && item.content_id) {
+        // Check if content_id is a YouTube URL or video ID
+        const urlMatch = item.content_id.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+        if (urlMatch && urlMatch[1]) {
+          videoId = urlMatch[1];
+        } else if (item.content_id.length === 11) {
+          // Assume it's a YouTube video ID if it's 11 characters
+          videoId = item.content_id;
+        }
+      }
+
+      if (videoId) {
+        // Try to open in YouTube app first, then fallback to web
+        const youtubeAppUrl = `vnd.youtube://${videoId}`;
+        const youtubeWebUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+        const canOpenYouTube = await Linking.canOpenURL(youtubeAppUrl);
+        
+        if (canOpenYouTube) {
+          await Linking.openURL(youtubeAppUrl);
+        } else {
+          await Linking.openURL(youtubeWebUrl);
+        }
+      } else {
+        // Fallback: if we can't find a YouTube ID, open the regular item details
+        if (item.content_id && item.content_type) {
+          router.push(`/details/${item.content_type}/${item.content_id}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error opening YouTube video:', error);
+      // Fallback to regular item details
+      if (item.content_id && item.content_type) {
+        router.push(`/details/${item.content_type}/${item.content_id}`);
+      }
+    }
+  };
+
+  const handleItemPress = (item: ListItem, listCategory?: string) => {
+    if (!item.content_id || !item.content_type) {
+      return;
+    }
+
+    // Check if this is a YouTube video
+    const isYouTubeVideo = 
+      listCategory === 'youtube' ||
+      listCategory === 'videos' ||
+      item.content_type === 'video' ||
+      item.external_data?.videoId ||
+      item.external_data?.url?.includes('youtube') ||
+      item.content_id?.includes('youtube') ||
+      (item.content_id?.length === 11);
+
+    if (isYouTubeVideo) {
+      openYouTubeVideo(item);
+      return;
+    }
+
+    // Route to appropriate details page based on content_type
+    switch (item.content_type) {
+      case 'movie':
+        router.push(`/details/movie/${item.content_id}`);
+        break;
+      case 'tv':
+      case 'tv_show':
+        router.push(`/details/tv/${item.content_id}`);
+        break;
+      case 'book':
+        router.push(`/details/book/${item.content_id}`);
+        break;
+      case 'game':
+        router.push(`/details/game/${item.content_id}`);
+        break;
+      case 'place':
+        router.push(`/details/place/${item.content_id}`);
+        break;
+      case 'person':
+        router.push(`/details/person/${item.content_id}`);
+        break;
+      case 'video':
+        openYouTubeVideo(item);
+        break;
+      default:
+        // Fallback to generic details
+        router.push(`/details/${item.content_type}/${item.content_id}`);
+        break;
     }
   };
 
@@ -1615,8 +1726,8 @@ export default function ListDetailScreen() {
                   <TouchableOpacity 
                     style={styles.itemContent}
                     onPress={() => {
-                      if (!reorderMode && item.content_id && item.content_type) {
-                        router.push(`/details/${item.content_type}/${item.content_id}`);
+                      if (!reorderMode) {
+                        handleItemPress(item, listDetail?.category);
                       }
                     }}
                     disabled={reorderMode}

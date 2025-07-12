@@ -42,7 +42,7 @@ import {
 } from 'phosphor-react-native';
 
 // API services
-import { searchPlaces, PlaceResult } from '../services/yandexApi';
+import { searchPlaces, PlaceResult } from '../services/googleMapsApi';
 import { searchMulti, MovieResult, TVShowResult, PersonResult, getImageUrl } from '../services/tmdbApi';
 import { searchGames, GameResult, getGameImageUrl } from '../services/rawgApi';
 import { searchBooks, BookResult, getBookImageUrl } from '../services/googleBooksApi';
@@ -114,6 +114,7 @@ export default function CreateListScreen() {
   // YouTube specific
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [isYouTubeLoading, setIsYouTubeLoading] = useState(false);
+  const [youtubeTimeout, setYoutubeTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchCurrentUser();
@@ -280,17 +281,43 @@ export default function CreateListScreen() {
     }
   };
 
-  const handleYouTubeUrl = async () => {
-    if (!youtubeUrl.trim()) return;
+  const handleYouTubeUrlChange = (url: string) => {
+    setYoutubeUrl(url);
     
-    if (!isValidYouTubeUrl(youtubeUrl)) {
-      Alert.alert('Invalid URL', 'Please enter a valid YouTube URL');
+    // Clear existing timeout
+    if (youtubeTimeout) {
+      clearTimeout(youtubeTimeout);
+    }
+    
+    // If user entered a URL but it's not a valid YouTube URL, show warning
+    if (url.trim() && !isValidYouTubeUrl(url.trim())) {
+      // Check if it looks like a URL (contains http:// or https:// or www.)
+      const urlPattern = /^(https?:\/\/|www\.)/i;
+      if (urlPattern.test(url.trim())) {
+        Alert.alert(
+          'Invalid URL',
+          'Please paste only YouTube video links. Make sure the video is not private or restricted.',
+          [{ text: 'OK', style: 'default' }]
+        );
+      }
       return;
     }
     
+    // Only process if it's a valid YouTube URL
+    if (url.trim() && isValidYouTubeUrl(url.trim())) {
+      const timeout = setTimeout(() => {
+        processYouTubeUrl(url.trim());
+      }, 1000); // 1 second delay after user stops typing
+      
+      setYoutubeTimeout(timeout);
+    }
+  };
+
+  const processYouTubeUrl = async (url: string) => {
     setIsYouTubeLoading(true);
     try {
-      const video = await getVideoByUrl(youtubeUrl);
+      const video = await getVideoByUrl(url);
+      
       if (video) {
         const videoItem: SelectedItem = {
           id: video.id,
@@ -308,18 +335,30 @@ export default function CreateListScreen() {
         // Check if already selected
         if (!selectedItems.find(item => item.id === video.id)) {
           setSelectedItems([...selectedItems, videoItem]);
+          setYoutubeUrl(''); // Clear input after successful add
+          Alert.alert('Success', `Video "${video.title}" added to your list!`);
+        } else {
+          Alert.alert('Info', 'This video is already in your list.');
         }
-        
-        setYoutubeUrl('');
       } else {
-        Alert.alert('Error', 'Could not fetch video details');
+        Alert.alert(
+          'Video Not Found',
+          'Could not fetch video details. Please make sure the video is public and not restricted.',
+          [{ text: 'OK', style: 'default' }]
+        );
       }
     } catch (error) {
       console.error('YouTube URL error:', error);
-      Alert.alert('Error', 'Failed to fetch video details');
+      Alert.alert('Error', 'Failed to fetch video details. Please try again.');
     } finally {
       setIsYouTubeLoading(false);
     }
+  };
+
+  // Legacy function - keeping for backwards compatibility
+  const handleYouTubeUrl = async () => {
+    if (!youtubeUrl.trim()) return;
+    await processYouTubeUrl(youtubeUrl.trim());
   };
 
   const handleSelectItem = (item: any) => {
@@ -383,52 +422,75 @@ export default function CreateListScreen() {
     
     setIsLoading(true);
     try {
-      // First, get category_id from categories table
+      // Get category_id - using hardcoded UUIDs for now to bypass RLS issues
       let categoryData;
-      const { data: existingCategory, error: categoryError } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('name', listData.category)
-        .single();
       
-      if (categoryError) {
-        console.error('Category error:', categoryError);
-        // If category doesn't exist, create it or use default
-        // Get proper display name for category
-        const getCategoryDisplayName = (categoryKey: string) => {
-          const categoryMap: { [key: string]: string } = {
-            'places': 'Places',
-            'movies': 'Movies',
-            'tv_shows': 'TV Shows',
-            'books': 'Books',
-            'games': 'Games',
-            'videos': 'Videos',
-            'person': 'People'
-          };
-          return categoryMap[categoryKey] || categoryKey;
-        };
-        
-        const { data: newCategory, error: newCategoryError } = await supabase
-          .from('categories')
-          .insert({
-            name: listData.category,
-            display_name: getCategoryDisplayName(listData.category),
-            description: `${getCategoryDisplayName(listData.category)} category`,
-            icon: 'list',
-            color: '#F97316'
-          })
-          .select()
-          .single();
-        
-        if (newCategoryError) {
-          console.error('Error creating category:', newCategoryError);
-          Alert.alert('Error', 'Failed to create category. Please try again.');
+      const categoryUUIDs: { [key: string]: string } = {
+        'books': 'db00481e-a57e-4db8-89f8-fbf5fcd2cbfc',
+        'games': '533723c8-5379-42f4-a7ed-5a2ccbfb1eaa',
+        'movies': 'e373fcdd-5fa2-46b6-939a-b68812bf6ab0',
+        'person': '9a2f16b9-005d-46ca-9e62-1022e3f26f58',
+        'places': '86d4be93-d475-4668-a9ad-316bbda5dc9a',
+        'tv_shows': '8c7ee139-ad91-41f3-90c1-8bf4bc11a45f',
+        'videos': '951be7ba-8b49-4a0e-9331-1dcfb4e61cc5'
+      };
+      
+      if (categoryUUIDs[listData.category]) {
+        // Use hardcoded UUID for known categories
+        categoryData = { id: categoryUUIDs[listData.category] };
+      } else {
+        // Try to fetch or create category for unknown categories
+        try {
+          const { data: existingCategory, error: categoryError } = await supabase
+            .from('categories')
+            .select('id')
+            .eq('name', listData.category)
+            .limit(1);
+          
+          if (categoryError) {
+            console.error('Category query error:', categoryError);
+            throw categoryError;
+          }
+          
+          if (!existingCategory || existingCategory.length === 0) {
+            // If category doesn't exist, create it
+            const getCategoryDisplayName = (categoryKey: string) => {
+              const categoryMap: { [key: string]: string } = {
+                'places': 'Places',
+                'movies': 'Movies', 
+                'tv_shows': 'TV Shows',
+                'books': 'Books',
+                'games': 'Games',
+                'videos': 'Videos',
+                'person': 'People'
+              };
+              return categoryMap[categoryKey] || categoryKey.charAt(0).toUpperCase() + categoryKey.slice(1);
+            };
+            
+            const { data: newCategory, error: newCategoryError } = await supabase
+              .from('categories')
+              .insert({
+                name: listData.category,
+                display_name: getCategoryDisplayName(listData.category),
+                icon: 'list'
+              })
+              .select()
+              .single();
+            
+            if (newCategoryError) {
+              console.error('Error creating category:', newCategoryError);
+              throw newCategoryError;
+            }
+            categoryData = newCategory;
+          } else {
+            categoryData = existingCategory[0];
+          }
+        } catch (error) {
+          console.error('Category error:', error);
+          Alert.alert('Error', 'Failed to handle category. Please try again.');
           setIsLoading(false);
           return;
         }
-        categoryData = newCategory;
-      } else {
-        categoryData = existingCategory;
       }
       
       // Create list
@@ -471,12 +533,8 @@ export default function CreateListScreen() {
       
       if (itemsError) throw itemsError;
       
-      Alert.alert('Success', 'List created successfully!', [
-        {
-          text: 'OK',
-          onPress: () => router.push(`/list/${list.id}`),
-        },
-      ]);
+      // Navigate directly to list detail page
+      router.push(`/list/${list.id}`);
     } catch (error) {
       console.error('Error creating list:', error);
       Alert.alert('Error', 'Failed to create list. Please try again.');
@@ -647,22 +705,16 @@ export default function CreateListScreen() {
                 style={styles.youtubeInput}
                 placeholder="Paste YouTube video URL here..."
                 value={youtubeUrl}
-                onChangeText={setYoutubeUrl}
+                onChangeText={handleYouTubeUrlChange}
                 multiline={false}
                 autoCapitalize="none"
                 keyboardType="url"
               />
-              <TouchableOpacity
-                style={styles.youtubeButton}
-                onPress={handleYouTubeUrl}
-                disabled={isYouTubeLoading}
-              >
-                {isYouTubeLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Plus size={20} color="#fff" />
-                )}
-              </TouchableOpacity>
+              {isYouTubeLoading && (
+                <View style={styles.youtubeLoadingIndicator}>
+                  <ActivityIndicator size="small" color="#F97316" />
+                </View>
+              )}
             </View>
           </View>
         ) : (
@@ -1193,9 +1245,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   youtubeInputContainer: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
   },
   youtubeInput: {
     flex: 1,
@@ -1204,16 +1256,19 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    paddingRight: 50,
     fontSize: 15,
     fontFamily: 'Inter',
     fontWeight: '400',
     backgroundColor: '#F9FAFB',
   },
-  youtubeButton: {
-    backgroundColor: '#F97316',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+  youtubeLoadingIndicator: {
+    position: 'absolute',
+    right: 14,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   selectedItemsContainer: {
     marginBottom: 20,

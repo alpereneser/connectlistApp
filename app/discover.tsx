@@ -2,11 +2,12 @@ import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, ActivityIn
 import AppBar from '../components/AppBar';
 import BottomMenu from '../components/BottomMenu';
 import { fontConfig } from '../styles/global';
-import { Users, UserPlus, Heart, MapPin, TrendUp } from 'phosphor-react-native';
+import { Users, UserPlus, Heart, MapPin, TrendUp, Star } from 'phosphor-react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { withErrorHandling } from '../utils/errorHandler';
+import { discoverPlaces, PlaceResult } from '../services/googleMapsApi';
 
 interface User {
   id: string;
@@ -27,6 +28,7 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const [suggestedPeople, setSuggestedPeople] = useState<User[]>([]);
   const [trendingTopics, setTrendingTopics] = useState<Topic[]>([]);
+  const [popularPlaces, setPopularPlaces] = useState<PlaceResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -38,6 +40,7 @@ export default function DiscoverScreen() {
     if (currentUser) {
       fetchSuggestedPeople();
       fetchTrendingTopics();
+      fetchPopularPlaces();
     }
   }, [currentUser]);
 
@@ -110,6 +113,13 @@ export default function DiscoverScreen() {
     });
   };
 
+  const fetchPopularPlaces = async () => {
+    await withErrorHandling(async () => {
+      const response = await discoverPlaces();
+      setPopularPlaces(response.results.slice(0, 6)); // Show only 6 places
+    });
+  };
+
   const handleTabPress = (tab: string) => {
     if (tab === 'home') {
       router.push('/');
@@ -142,6 +152,11 @@ export default function DiscoverScreen() {
 
   const handleTopicPress = (topic: string) => {
     router.push(`/topic/${encodeURIComponent(topic)}`);
+  };
+
+  const handlePlacePress = (place: PlaceResult) => {
+    const placeData = encodeURIComponent(JSON.stringify({ ...place, type: 'place' }));
+    router.push(`/details/place/${place.id}?data=${placeData}`);
   };
 
   const getTopicIcon = (topic: string): string => {
@@ -232,6 +247,46 @@ export default function DiscoverScreen() {
                     <Text style={styles.connectButtonText}>Follow</Text>
                   </TouchableOpacity>
                 </View>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* Popular Places Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <MapPin size={20} color="#FF6B35" />
+              <Text style={styles.sectionTitle}>Popular Places</Text>
+            </View>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+              {popularPlaces.map((place) => (
+                <TouchableOpacity 
+                  key={place.id} 
+                  style={styles.placeCard}
+                  onPress={() => handlePlacePress(place)}
+                >
+                  <View style={styles.placeImageContainer}>
+                    {place.image ? (
+                      <Image 
+                        source={{ uri: place.image }} 
+                        style={styles.placeImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.placePlaceholder}>
+                        <MapPin size={24} color="#9CA3AF" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.placeName} numberOfLines={2}>{place.name}</Text>
+                  <Text style={styles.placeCategory} numberOfLines={1}>{place.category}</Text>
+                  {place.rating && (
+                    <View style={styles.placeRating}>
+                      <Star size={12} color="#F59E0B" weight="fill" />
+                      <Text style={styles.placeRatingText}>{place.rating}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
@@ -484,5 +539,65 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     marginBottom: 4,
+  },
+  placeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    marginRight: 12,
+    width: 160,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  placeImageContainer: {
+    width: '100%',
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  placeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  placePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  placeName: {
+    fontFamily: 'Inter',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  placeCategory: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  placeRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  placeRatingText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#F59E0B',
+    marginLeft: 4,
+    fontWeight: '600',
   },
 });

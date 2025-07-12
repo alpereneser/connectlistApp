@@ -11,6 +11,7 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -45,6 +46,7 @@ export default function SettingsScreen() {
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showPrivacySettings, setShowPrivacySettings] = useState(false);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(true);
   
   // Profile data
   const [userProfile, setUserProfile] = useState({
@@ -222,7 +224,90 @@ export default function SettingsScreen() {
     }
   }, [userProfile]);
 
+  const handleImageUpload = useCallback(async (file) => {
+    setUploadingAvatar(true);
+    try {
+      // Check file size (2MB limit)
+      if (file.size > 2 * 1024 * 1024) {
+        Alert.alert('Error', 'Image size must be less than 2MB');
+        return;
+      }
+
+      // Get file extension
+      const fileExt = file.name?.split('.').pop() || 'jpg';
+      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`;
+      const filePath = fileName;
+
+      // Convert file to ArrayBuffer for Supabase upload
+      const arrayBuffer = await file.arrayBuffer();
+
+      // Retry mechanism for upload
+      let uploadSuccess = false;
+      let uploadData = null;
+      let uploadError = null;
+      
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, arrayBuffer, {
+            contentType: file.type,
+            upsert: true
+          });
+        
+        if (!error) {
+          uploadData = data;
+          uploadSuccess = true;
+          break;
+        }
+        
+        uploadError = error;
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+        }
+      }
+
+      if (!uploadSuccess) {
+        throw uploadError;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('users_profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', userProfile.id);
+
+      if (updateError) throw updateError;
+
+      setUserProfile(prev => ({ ...prev, avatar_url: publicUrl }));
+      Alert.alert('Success', 'Profile picture updated successfully');
+    } catch (error) {
+      console.error('Avatar upload error:', error);
+      Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }, [userProfile.id]);
+
   const handleAvatarUpload = useCallback(async () => {
+    if (Platform.OS === 'web') {
+      // Web platform: Use HTML file input
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          await handleImageUpload(file);
+        }
+      };
+      input.click();
+      return;
+    }
+
+    // Mobile platforms: Use expo-image-picker
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (!permissionResult.granted) {
@@ -238,43 +323,23 @@ export default function SettingsScreen() {
     });
 
     if (!result.canceled) {
-      setUploadingAvatar(true);
       try {
         const photo = result.assets[0];
-        const fileExt = photo.uri.substring(photo.uri.lastIndexOf('.') + 1);
-        const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`;
-        const filePath = `avatars/${fileName}`;
-
-        const formData = new FormData();
-        formData.append('file', {
-          uri: photo.uri,
-          name: fileName,
-          type: `image/${fileExt}`,
-        } as any);
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(filePath, formData);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
-          .getPublicUrl(filePath);
-
-        const { error: updateError } = await supabase
-          .from('users_profiles')
-          .update({ avatar_url: publicUrl })
-          .eq('id', userProfile.id);
-
-        if (updateError) throw updateError;
-
-        setUserProfile(prev => ({ ...prev, avatar_url: publicUrl }));
-        Alert.alert('Success', 'Avatar updated successfully');
+        const response = await fetch(photo.uri);
+        const blob = await response.blob();
+        
+        // Create a File-like object for mobile
+        const file = {
+          size: blob.size,
+          name: `avatar.${photo.uri.substring(photo.uri.lastIndexOf('.') + 1)}`,
+          type: `image/${photo.uri.substring(photo.uri.lastIndexOf('.') + 1)}`,
+          arrayBuffer: () => blob.arrayBuffer()
+        };
+        
+        await handleImageUpload(file);
       } catch (error) {
-        Alert.alert('Error', 'Failed to upload avatar');
-      } finally {
-        setUploadingAvatar(false);
+        console.error('Mobile image processing error:', error);
+        Alert.alert('Error', 'Failed to process image. Please try again.');
       }
     }
   }, [userProfile.id]);
@@ -532,7 +597,7 @@ export default function SettingsScreen() {
               <Switch
                 value={userProfile.is_private}
                 onValueChange={(value) => setUserProfile(prev => ({ ...prev, is_private: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             </View>
           </View>
@@ -597,7 +662,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.show_email}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, show_email: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -609,7 +674,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.show_phone}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, show_phone: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -621,7 +686,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.show_location}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, show_location: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -633,7 +698,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.show_birth_date}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, show_birth_date: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
           </View>
@@ -649,7 +714,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.allow_search_by_email}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, allow_search_by_email: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -661,7 +726,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.allow_search_by_phone}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, allow_search_by_phone: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
           </View>
@@ -677,7 +742,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.allow_friend_requests}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, allow_friend_requests: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -689,7 +754,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.show_online_status}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, show_online_status: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -701,7 +766,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.allow_list_likes}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, allow_list_likes: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -713,7 +778,7 @@ export default function SettingsScreen() {
               <Switch
                 value={privacySettings.allow_list_comments}
                 onValueChange={(value) => setPrivacySettings(prev => ({ ...prev, allow_list_comments: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
           </View>
@@ -756,7 +821,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.email_notifications}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, email_notifications: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -768,7 +833,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.push_notifications}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, push_notifications: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -780,7 +845,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.sms_notifications}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, sms_notifications: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
           </View>
@@ -796,7 +861,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.list_likes}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, list_likes: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -808,7 +873,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.list_comments}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, list_comments: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -820,7 +885,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.new_followers}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, new_followers: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -832,7 +897,26 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.list_shares}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, list_shares: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
+              />
+            )}
+          </View>
+
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>Push Notifications</Text>
+            
+            {renderSettingsItem(
+              <Bell size={20} color="#333" />,
+              'Enable Push Notifications',
+              'Receive notifications on your device',
+              false,
+              <Switch
+                value={pushNotificationsEnabled}
+                onValueChange={(value) => {
+                  setPushNotificationsEnabled(value);
+                  // TODO: Handle push notification permission request
+                }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
           </View>
@@ -848,7 +932,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.weekly_digest}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, weekly_digest: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -860,7 +944,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.product_updates}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, product_updates: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
             
@@ -872,7 +956,7 @@ export default function SettingsScreen() {
               <Switch
                 value={notificationSettings.tips_and_tutorials}
                 onValueChange={(value) => setNotificationSettings(prev => ({ ...prev, tips_and_tutorials: value }))}
-                trackColor={{ false: '#D9D9D9', true: '#007AFF' }}
+                trackColor={{ false: '#D9D9D9', true: '#FF8C00' }}
               />
             )}
           </View>
@@ -1174,7 +1258,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FF8C00',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
@@ -1183,7 +1267,7 @@ const styles = StyleSheet.create({
   changePhotoText: {
     fontSize: 14,
     fontFamily: 'Inter',
-    color: '#007AFF',
+    color: '#FF8C00',
   },
   formSection: {
     paddingBottom: 32,
@@ -1256,8 +1340,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   genderOptionActive: {
-    borderColor: '#007AFF',
-    backgroundColor: '#007AFF',
+    borderColor: '#FF8C00',
+    backgroundColor: '#FF8C00',
   },
   genderOptionText: {
     fontSize: 14,
@@ -1293,7 +1377,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: '#FF8C00',
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1302,7 +1386,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FF8C00',
   },
   radioText: {
     fontSize: 16,

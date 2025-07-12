@@ -11,11 +11,18 @@ try {
 export const initSentry = () => {
   if (!Sentry) return;
   
+  // Skip Sentry in development or if no DSN is provided
+  const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+  if (!dsn || __DEV__) {
+    console.log('Sentry disabled in development mode');
+    return;
+  }
+  
   Sentry.init({
-    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN, // You'll need to add this to your .env file
-    debug: __DEV__, // Enable debug in development
-    tracesSampleRate: 1.0, // Adjust for production
-    environment: __DEV__ ? 'development' : 'production',
+    dsn,
+    debug: false, // Disable debug to reduce logs
+    tracesSampleRate: 0.1, // Reduce sampling in production
+    environment: 'production',
     beforeSend(event) {
       // Filter out sensitive data
       if (event.request) {

@@ -11,12 +11,21 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { supabase } from '../lib/supabase';
 import { initSentry, setUserContext, clearUserContext } from '../lib/sentry';
 import ErrorBoundary from '../components/ErrorBoundary';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export default function RootLayout() {
-  // Initialize Sentry
+  // Initialize Sentry and Push Notifications
+  const { expoPushToken } = usePushNotifications();
+  
   useEffect(() => {
     initSentry();
   }, []);
+
+  useEffect(() => {
+    if (expoPushToken) {
+      console.log('Push token registered:', expoPushToken);
+    }
+  }, [expoPushToken]);
 
   const colorScheme = useColorScheme();
   const router = useRouter();
@@ -94,17 +103,23 @@ export default function RootLayout() {
           <Stack.Screen name="create-list" />
           <Stack.Screen name="discover" />
           <Stack.Screen name="profile" />
+          <Stack.Screen name="settings" />
+          <Stack.Screen name="messages" />
+          <Stack.Screen name="list/[id]" />
           <Stack.Screen name="details/[id]" />
           <Stack.Screen name="details/movie/[id]" />
           <Stack.Screen name="details/tv/[id]" />
           <Stack.Screen name="details/book/[id]" />
           <Stack.Screen name="details/game/[id]" />
           <Stack.Screen name="details/person/[id]" />
+          <Stack.Screen name="details/place/[id]" />
           <Stack.Screen name="auth/login" />
           <Stack.Screen name="auth/register" />
           <Stack.Screen name="auth/email-verification" />
           <Stack.Screen name="auth/forgot-password" />
           <Stack.Screen name="onboarding/index" />
+          <Stack.Screen name="privacy-policy" />
+          <Stack.Screen name="terms-of-service" />
           <Stack.Screen name="+not-found" />
         </Stack>
         </ThemeProvider>

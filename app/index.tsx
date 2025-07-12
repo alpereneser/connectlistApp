@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, Share, Platform, RefreshControl } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, Share, Platform, RefreshControl, Linking } from 'react-native';
 import AppBar from '../components/AppBar';
 import BottomMenu from '../components/BottomMenu';
 import { fontConfig } from '../styles/global';
@@ -107,10 +107,12 @@ function HomeContent() {
 
         // Fetch categories data separately  
         const categoryNames = [...new Set(listsData.map(list => list.category).filter(Boolean))];
-        const { data: categoriesData } = await supabase
+        console.log('Category names to fetch:', categoryNames); // Debug log
+        const { data: categoriesData, error: categoriesError } = await supabase
           .from('categories')
           .select('name, display_name')
           .in('name', categoryNames);
+        console.log('Categories data:', categoriesData, 'Categories error:', categoriesError); // Debug log
 
         // Create lookup maps
         const usersMap = usersData?.reduce((acc, user) => ({ ...acc, [user.id]: user }), {}) || {};
@@ -249,6 +251,109 @@ function HomeContent() {
     router.push(`/list/${listId}#comments`);
   };
 
+  const openYouTubeVideo = async (item: any) => {
+    try {
+      let videoId = null;
+
+      // Try to extract YouTube video ID from external_data
+      if (item.external_data) {
+        if (item.external_data.videoId) {
+          videoId = item.external_data.videoId;
+        } else if (item.external_data.url) {
+          const urlMatch = item.external_data.url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+          if (urlMatch && urlMatch[1]) {
+            videoId = urlMatch[1];
+          }
+        }
+      }
+
+      // If we still don't have a video ID, try to extract from content_id
+      if (!videoId && item.content_id) {
+        const urlMatch = item.content_id.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/);
+        if (urlMatch && urlMatch[1]) {
+          videoId = urlMatch[1];
+        } else if (item.content_id.length === 11) {
+          videoId = item.content_id;
+        }
+      }
+
+      if (videoId) {
+        const youtubeAppUrl = `vnd.youtube://${videoId}`;
+        const youtubeWebUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+        const canOpenYouTube = await Linking.canOpenURL(youtubeAppUrl);
+        
+        if (canOpenYouTube) {
+          await Linking.openURL(youtubeAppUrl);
+        } else {
+          await Linking.openURL(youtubeWebUrl);
+        }
+      } else {
+        // Fallback to regular details if no YouTube ID found
+        if (item.content_id && item.content_type) {
+          router.push(`/details/${item.content_type}/${item.content_id}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error opening YouTube video:', error);
+      // Fallback to regular item details
+      if (item.content_id && item.content_type) {
+        router.push(`/details/${item.content_type}/${item.content_id}`);
+      }
+    }
+  };
+
+  const handleItemPress = (item: any, listCategory?: string) => {
+    if (!item.content_id || !item.content_type) {
+      return;
+    }
+
+    // Check if this is a YouTube video
+    const isYouTubeVideo = 
+      listCategory === 'youtube' ||
+      listCategory === 'videos' ||
+      item.content_type === 'video' ||
+      item.external_data?.videoId ||
+      item.external_data?.url?.includes('youtube') ||
+      item.content_id?.includes('youtube') ||
+      (item.content_id?.length === 11);
+
+    if (isYouTubeVideo) {
+      openYouTubeVideo(item);
+      return;
+    }
+
+    // Route to appropriate details page based on content_type
+    switch (item.content_type) {
+      case 'movie':
+        router.push(`/details/movie/${item.content_id}`);
+        break;
+      case 'tv':
+      case 'tv_show':
+        router.push(`/details/tv/${item.content_id}`);
+        break;
+      case 'book':
+        router.push(`/details/book/${item.content_id}`);
+        break;
+      case 'game':
+        router.push(`/details/game/${item.content_id}`);
+        break;
+      case 'place':
+        router.push(`/details/place/${item.content_id}`);
+        break;
+      case 'person':
+        router.push(`/details/person/${item.content_id}`);
+        break;
+      case 'video':
+        openYouTubeVideo(item);
+        break;
+      default:
+        // Fallback to generic details
+        router.push(`/details/${item.content_type}/${item.content_id}`);
+        break;
+    }
+  };
+
   const handleShare = async (list: any) => {
     try {
       const shareUrl = `https://connectlist.app/list/${list.id}`;
@@ -291,6 +396,8 @@ function HomeContent() {
 
   // Helper functions
   const getCategoryDisplayName = (category: string) => {
+    if (!category) return 'General';
+    
     switch (category) {
       case 'movies':
         return 'Movies';
@@ -305,7 +412,8 @@ function HomeContent() {
       case 'persons':
         return 'People';
       default:
-        return 'General';
+        // Use the category name with proper formatting if it's not in our predefined list
+        return category.charAt(0).toUpperCase() + category.slice(1).replace(/_/g, ' ');
     }
   };
 
@@ -344,6 +452,28 @@ function HomeContent() {
         return '👤';
       default:
         return '📝';
+    }
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return `${diffInSeconds}s`;
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h`;
+    } else if (diffInSeconds < 604800) {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days}d`;
+    } else {
+      const weeks = Math.floor(diffInSeconds / 604800);
+      return `${weeks}w`;
     }
   };
 
@@ -394,8 +524,6 @@ function HomeContent() {
                       <Text style={styles.listAuthorName}>
                         {creator?.full_name || creator?.username || 'Unknown User'}
                       </Text>
-                      <Text style={styles.listAction}>created</Text>
-                      <Text style={styles.listTitle}>{list.title}</Text>
                     </View>
                     <View style={styles.listMeta}>
                       <Text style={styles.listUsername}>
@@ -409,14 +537,20 @@ function HomeContent() {
                         </Text>
                       </View>
                       <Text style={styles.separator}>•</Text>
-                      <Text style={styles.listItemCount}>{list.item_count || 0} items</Text>
+                      <Text style={styles.listItemCount}>{getTimeAgo(list.created_at)}</Text>
                     </View>
                   </View>
                 </View>
               </TouchableOpacity>
               
+              <TouchableOpacity onPress={() => router.push(`/list/${list.id}`)}>
+                <Text style={styles.listTitleMain}>{list.title}</Text>
+              </TouchableOpacity>
+              
               {list.description && (
-                <Text style={styles.listDescriptionText}>{list.description}</Text>
+                <Text style={styles.listDescriptionText}>
+                  {list.description.length > 140 ? `${list.description.substring(0, 140)}...` : list.description}
+                </Text>
               )}
               
               <View style={styles.divider} />
@@ -433,11 +567,7 @@ function HomeContent() {
                       <TouchableOpacity 
                         key={item.id} 
                         style={styles.listItemCard}
-                        onPress={() => {
-                          if (item.content_id && item.content_type) {
-                            router.push(`/details/${item.content_type}/${item.content_id}`);
-                          }
-                        }}
+                        onPress={() => handleItemPress(item, list.category)}
                       >
                         {item.image_url ? (
                           <Image source={{ uri: item.image_url }} style={styles.itemImage} />
@@ -725,5 +855,13 @@ const styles = StyleSheet.create({
   },
   statTextActive: {
     color: '#EF4444',
+  },
+  listTitleMain: {
+    fontFamily: 'Inter',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 8,
+    marginTop: 4,
   },
 });

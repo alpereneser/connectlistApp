@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Platform, TouchableOpacity, Image } from 'react
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, ChatCircle, ArrowLeft } from 'phosphor-react-native';
+import { ChatCircle, ArrowLeft } from 'phosphor-react-native';
 // Font config removed - using direct font properties
 
 interface AppBarProps {
@@ -22,7 +22,7 @@ export default function AppBar({ title = 'ConnectList', showBackButton = false, 
   
   return (
     <>
-      <StatusBar style="dark" translucent={false} />
+      <StatusBar style="dark" />
       <View style={[styles.container, { paddingTop: insets.top + 24 }]}>
         <View style={styles.leftSection}>
           {showBackButton && (
@@ -49,12 +49,6 @@ export default function AppBar({ title = 'ConnectList', showBackButton = false, 
             </TouchableOpacity>
           ) : !showBackButton ? (
             <>
-              <TouchableOpacity 
-                style={styles.iconButton}
-                onPress={() => router.push('/notifications')}
-              >
-                <Bell size={24} color="#1F2937" weight="regular" />
-              </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.iconButton}
                 onPress={() => router.push('/messages')}
@@ -115,7 +109,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   logo: {
-    height: 28,
-    width: 120,
+    height: 32,
+    width: 138,
   },
 });

@@ -1,31 +1,39 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { ENV } from '../config/env';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_KEY!;
+const supabaseUrl = ENV.SUPABASE_URL;
+const supabaseAnonKey = ENV.SUPABASE_ANON_KEY;
 
 // Custom storage implementation for Expo
 const ExpoSecureStoreAdapter = {
   getItem: (key: string) => {
     if (Platform.OS === 'web') {
-      // For web, use localStorage
-      return Promise.resolve(localStorage.getItem(key));
+      // For web, use localStorage with safety check
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return Promise.resolve(localStorage.getItem(key));
+      }
+      return Promise.resolve(null);
     }
     return SecureStore.getItemAsync(key);
   },
   setItem: (key: string, value: string) => {
     if (Platform.OS === 'web') {
-      // For web, use localStorage
-      localStorage.setItem(key, value);
+      // For web, use localStorage with safety check
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(key, value);
+      }
       return Promise.resolve();
     }
     return SecureStore.setItemAsync(key, value);
   },
   removeItem: (key: string) => {
     if (Platform.OS === 'web') {
-      // For web, use localStorage
-      localStorage.removeItem(key);
+      // For web, use localStorage with safety check
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(key);
+      }
       return Promise.resolve();
     }
     return SecureStore.deleteItemAsync(key);
@@ -38,6 +46,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // For development: Skip email confirmation
+    flowType: 'pkce',
   },
 });
 

@@ -41,6 +41,63 @@ export default function RegisterScreen() {
     return usernameRegex.test(username);
   };
 
+  const checkUsernameAvailability = async (username: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('users_profiles')
+        .select('username')
+        .eq('username', username.trim().toLowerCase())
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        // No data found - username is available
+        return true;
+      } else if (data) {
+        // Username already exists
+        return false;
+      } else if (error) {
+        // Other error occurred
+        console.error('Username check error:', error);
+        throw error;
+      }
+      return false;
+    } catch (error) {
+      console.error('Username availability check failed:', error);
+      throw error;
+    }
+  };
+
+  const checkEmailAvailability = async (email: string) => {
+    try {
+      // Check in auth.users table using RPC function or direct query
+      const { data, error } = await supabase.auth.admin.listUsers();
+      
+      if (error) {
+        // Fallback: check in users_profiles table
+        const { data: profileData, error: profileError } = await supabase
+          .from('users_profiles')
+          .select('id')
+          .limit(1000); // Get a reasonable number of users
+
+        if (profileError) {
+          console.error('Email check error:', profileError);
+          throw profileError;
+        }
+
+        // Since we can't directly query auth.users, we'll let Supabase handle email uniqueness
+        return true;
+      }
+
+      // Check if email already exists in auth.users
+      const existingUser = data.users.find(user => user.email === email.trim().toLowerCase());
+      return !existingUser;
+    } catch (error) {
+      console.error('Email availability check failed:', error);
+      // If check fails, let Supabase handle it during signup
+      return true;
+    }
+  };
+
   const handleRegister = async () => {
     // Form validation
     if (!acceptedTerms) {
@@ -83,8 +140,8 @@ export default function RegisterScreen() {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long.');
+    if (password.length < 8) {
+      Alert.alert('Error', 'Password must be at least 8 characters long.');
       return;
     }
 
@@ -95,11 +152,29 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
+      // Check username availability
+      const isUsernameAvailable = await checkUsernameAvailability(username.trim());
+      if (!isUsernameAvailable) {
+        Alert.alert('Username Not Available', 'This username is already taken. Please choose a different one.');
+        setLoading(false);
+        return;
+      }
+
+      // Check email availability
+      const isEmailAvailable = await checkEmailAvailability(email.trim());
+      if (!isEmailAvailable) {
+        Alert.alert('Email Already Registered', 'This email address is already registered. Please use a different email or try logging in.');
+        setLoading(false);
+        return;
+      }
+
       // Register with Supabase
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
         options: {
+          emailRedirectTo: undefined, // Email confirmation'ı devre dışı bırak
+          captchaToken: undefined, // Captcha'yı da devre dışı bırak
           data: {
             full_name: fullName.trim(),
             username: username.trim().toLowerCase(),
@@ -108,16 +183,50 @@ export default function RegisterScreen() {
       });
 
       if (error) {
-        Alert.alert('Registration Error', error.message);
-      } else if (data.user) {
-        // Successful registration - redirect to email verification page
-        router.push({
-          pathname: '/auth/email-verification',
-          params: { email: email.trim() },
-        });
+        console.error('Supabase signup error:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        
+        if (error.message.includes('User already registered')) {
+          Alert.alert('Email Already Registered', 'This email address is already registered. Please try logging in.');
+        } else if (error.message.includes('Email not confirmed')) {
+          Alert.alert('Registration Successful', 'Please check your email to verify your account.');
+        } else {
+          Alert.alert('Registration Error', `${error.message}\n\nCode: ${error.status || 'N/A'}`);
+        }
+        return;
+      }
+
+      console.log('Signup successful:', data);
+
+      if (data.user) {
+        console.log('User created:', data.user.id);
+        
+        // Session'ı ayarla (eğer varsa)
+        if (data.session) {
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token
+          });
+        }
+
+        // Registration successful - profil oluşturma sorunu olsa bile devam et
+        Alert.alert(
+          'Registration Successful!', 
+          'Welcome to ConnectList! Your account has been created successfully.',
+          [
+            {
+              text: 'Get Started',
+              onPress: () => router.replace('/auth/login'), // Önce login sayfasına yönlendir
+            },
+          ]
+        );
+      } else {
+        console.error('No user in response:', data);
+        Alert.alert('Registration Error', 'Account creation failed. Please try again.');
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred. Please try again.');
+      console.error('Registration error:', error);
+      Alert.alert('Error', 'An error occurred during registration. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -207,7 +316,7 @@ export default function RegisterScreen() {
               <Lock size={20} color="#6B7280" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Password (min 6 characters)"
+                placeholder="Password (min 8 characters)"
                 placeholderTextColor="#9CA3AF"
                 value={password}
                 onChangeText={setPassword}

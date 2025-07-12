@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You've been invited to ConnectList</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f8fc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            border-radius: 16px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .content h2 {
+            color: #1f2937;
+            font-size: 24px;
+            margin: 0 0 20px 0;
+            font-weight: 600;
+        }
+        .content p {
+            color: #6b7280;
+            font-size: 16px;
+            margin: 0 0 20px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .invite-card {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 1px solid #bbf7d0;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .invite-card h3 {
+            color: #059669;
+            margin: 0 0 10px 0;
+            font-size: 18px;
+        }
+        .invite-card p {
+            color: #065f46;
+            margin: 0;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .feature {
+            text-align: center;
+            padding: 20px;
+        }
+        .feature-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        .feature h4 {
+            color: #1f2937;
+            font-size: 16px;
+            margin: 0 0 8px 0;
+        }
+        .feature p {
+            color: #6b7280;
+            font-size: 14px;
+            margin: 0;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 0;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .footer a {
+            color: #10B981;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .header, .content, .footer {
+                padding: 30px 20px;
+            }
+            .features {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://ikalabbzbdbfuxpbiazz.supabase.co/storage/v1/object/public/images//splash-icon.png" alt="ConnectList Logo" class="logo">
+            <h1>You've been invited!</h1>
+            <p>Join the ConnectList community</p>
+        </div>
+        
+        <div class="content">
+            <h2>You have been invited</h2>
+            
+            <div class="invite-card">
+                <h3>🎉 Special Invitation</h3>
+                <p>You've been invited to create a user on <strong>{{ .SiteURL }}</strong>. Join us and start creating amazing lists!</p>
+            </div>
+            
+            <p>ConnectList is a platform where you can create, share, and discover curated lists of movies, books, places, games, and more. Connect with like-minded people and explore new recommendations.</p>
+            
+            <a href="{{ .ConfirmationURL }}" class="cta-button">Accept the Invite</a>
+            
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">📚</div>
+                    <h4>Create Lists</h4>
+                    <p>Build personalized lists of your favorite content</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌟</div>
+                    <h4>Discover</h4>
+                    <p>Find new recommendations from the community</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🤝</div>
+                    <h4>Connect</h4>
+                    <p>Follow friends and share your interests</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎯</div>
+                    <h4>Organize</h4>
+                    <p>Keep track of what you want to watch, read, or visit</p>
+                </div>
+            </div>
+            
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #10B981; font-size: 14px;">{{ .ConfirmationURL }}</p>
+            
+            <p><em>This invitation link will expire in 7 days.</em></p>
+        </div>
+        
+        <div class="footer">
+            <p>If you weren't expecting this invitation, you can safely ignore this email.</p>
+            <p>© 2024 ConnectList. All rights reserved.</p>
+            <p><a href="#">Privacy Policy</a> • <a href="#">Terms of Service</a></p>
+        </div>
+    </div>
+</body>
+</html>

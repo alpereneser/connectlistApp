@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { House, MagnifyingGlass, Plus, Users, User } from 'phosphor-react-native';
+import { House, MagnifyingGlass, Plus, Bell, User } from 'phosphor-react-native';
 
 interface BottomMenuProps {
   activeTab?: string;
@@ -58,12 +58,12 @@ export default function BottomMenu({ activeTab = 'home', onTabPress }: BottomMen
 
       <TouchableOpacity 
         style={styles.tabButton} 
-        onPress={() => handleTabPress('discover')}
+        onPress={() => handleTabPress('notifications')}
       >
-        <Users 
+        <Bell 
           size={24} 
-          color={getIconColor('discover')} 
-          weight={currentTab === 'discover' ? 'fill' : 'regular'} 
+          color={getIconColor('notifications')} 
+          weight={currentTab === 'notifications' ? 'fill' : 'regular'} 
         />
       </TouchableOpacity>
 

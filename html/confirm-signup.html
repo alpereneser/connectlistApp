@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm Your ConnectList Signup</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f7f8fc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #FF6B35 0%, #F97316 100%);
+            padding: 40px 30px;
+            text-align: center;
+            color: white;
+        }
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            border-radius: 16px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .header p {
+            margin: 10px 0 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .content h2 {
+            color: #1f2937;
+            font-size: 24px;
+            margin: 0 0 20px 0;
+            font-weight: 600;
+        }
+        .content p {
+            color: #6b7280;
+            font-size: 16px;
+            margin: 0 0 20px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #FF6B35 0%, #F97316 100%);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+            transition: transform 0.2s;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .info-box {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .info-box p {
+            margin: 0;
+            font-size: 14px;
+            color: #374151;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 0;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .footer a {
+            color: #FF6B35;
+            text-decoration: none;
+        }
+        .social-links {
+            margin: 20px 0;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 10px;
+            color: #6b7280;
+            text-decoration: none;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .header, .content, .footer {
+                padding: 30px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <img src="https://ikalabbzbdbfuxpbiazz.supabase.co/storage/v1/object/public/images//splash-icon.png" alt="ConnectList Logo" class="logo">
+            <h1>Welcome to ConnectList!</h1>
+            <p>Just one more step to get started</p>
+        </div>
+        
+        <div class="content">
+            <h2>Confirm your signup</h2>
+            <p>Hi there!</p>
+            <p>Thanks for joining ConnectList! To complete your registration and start creating amazing lists, please confirm your email address by clicking the button below.</p>
+            
+            <a href="{{ .ConfirmationURL }}" class="cta-button">Confirm Your Email</a>
+            
+            <div class="info-box">
+                <p><strong>Why confirm your email?</strong></p>
+                <p>• Secure your account and enable password recovery</p>
+                <p>• Receive important updates about your lists</p>
+                <p>• Connect with friends and discover new content</p>
+            </div>
+            
+            <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #FF6B35; font-size: 14px;">{{ .ConfirmationURL }}</p>
+            
+            <p>This confirmation link will expire in 24 hours for security reasons.</p>
+        </div>
+        
+        <div class="footer">
+            <p>If you didn't create a ConnectList account, you can safely ignore this email.</p>
+            
+            <div class="social-links">
+                <a href="#">Twitter</a> • 
+                <a href="#">Instagram</a> • 
+                <a href="#">Support</a>
+            </div>
+            
+            <p>© 2024 ConnectList. All rights reserved.</p>
+            <p><a href="#">Privacy Policy</a> • <a href="#">Terms of Service</a></p>
+        </div>
+    </div>
+</body>
+</html>

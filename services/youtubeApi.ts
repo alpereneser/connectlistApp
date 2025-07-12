@@ -1,4 +1,4 @@
-const YOUTUBE_API_KEY = 'AIzaSyDe4BIkhTKqHXggqlT88_04nDvfeePXc7w';
+const YOUTUBE_API_KEY = process.env.EXPO_PUBLIC_YOUTUBE_API_KEY || ''; // This key is blocked, using oEmbed instead
 const YOUTUBE_BASE_URL = 'https://www.googleapis.com/youtube/v3';
 
 export interface YouTubeVideo {
@@ -27,12 +27,13 @@ export const extractVideoId = (url: string): string | null => {
   return match ? match[1] : null;
 };
 
-// Get video details by video ID
+// Get video details by video ID using oEmbed API (no API key required)
 export const getVideoById = async (videoId: string): Promise<YouTubeVideo | null> => {
   try {
-    const response = await fetch(
-      `${YOUTUBE_BASE_URL}/videos?part=snippet,statistics,contentDetails&id=${videoId}&key=${YOUTUBE_API_KEY}`
-    );
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(videoUrl)}&format=json`;
+    
+    const response = await fetch(oembedUrl);
     
     if (!response.ok) {
       throw new Error('Failed to fetch video details');
@@ -40,19 +41,18 @@ export const getVideoById = async (videoId: string): Promise<YouTubeVideo | null
     
     const data = await response.json();
     
-    if (data.items && data.items.length > 0) {
-      const video = data.items[0];
+    if (data.title) {
       return {
-        id: video.id,
-        title: video.snippet.title,
-        description: video.snippet.description,
-        thumbnail: video.snippet.thumbnails.high?.url || video.snippet.thumbnails.default?.url,
-        channelTitle: video.snippet.channelTitle,
-        publishedAt: video.snippet.publishedAt,
-        duration: video.contentDetails.duration,
-        viewCount: video.statistics.viewCount || '0',
-        likeCount: video.statistics.likeCount || '0',
-        url: `https://www.youtube.com/watch?v=${video.id}`,
+        id: videoId,
+        title: data.title,
+        description: data.title, // oEmbed doesn't provide full description
+        thumbnail: data.thumbnail_url || getVideoThumbnail(videoId, 'high'),
+        channelTitle: data.author_name,
+        publishedAt: new Date().toISOString(), // oEmbed doesn't provide publish date
+        duration: 'Unknown', // oEmbed doesn't provide duration
+        viewCount: '0', // oEmbed doesn't provide view count
+        likeCount: '0', // oEmbed doesn't provide like count
+        url: videoUrl,
       };
     }
     
@@ -66,6 +66,7 @@ export const getVideoById = async (videoId: string): Promise<YouTubeVideo | null
 // Get video details by URL
 export const getVideoByUrl = async (url: string): Promise<YouTubeVideo | null> => {
   const videoId = extractVideoId(url);
+  
   if (!videoId) {
     return null;
   }
@@ -73,56 +74,18 @@ export const getVideoByUrl = async (url: string): Promise<YouTubeVideo | null> =
   return await getVideoById(videoId);
 };
 
-// Search YouTube videos
+// Search YouTube videos - Limited without API key, returning empty for now
 export const searchYouTubeVideos = async (
   query: string,
   maxResults: number = 10,
   pageToken?: string
 ): Promise<YouTubeSearchResult> => {
   try {
-    let searchUrl = `${YOUTUBE_BASE_URL}/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=${maxResults}&key=${YOUTUBE_API_KEY}`;
-    
-    if (pageToken) {
-      searchUrl += `&pageToken=${pageToken}`;
-    }
-    
-    const response = await fetch(searchUrl);
-    
-    if (!response.ok) {
-      throw new Error('Failed to search videos');
-    }
-    
-    const data = await response.json();
-    
-    // Get detailed information for each video
-    const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
-    const detailsResponse = await fetch(
-      `${YOUTUBE_BASE_URL}/videos?part=snippet,statistics,contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`
-    );
-    
-    if (!detailsResponse.ok) {
-      throw new Error('Failed to fetch video details');
-    }
-    
-    const detailsData = await detailsResponse.json();
-    
-    const videos: YouTubeVideo[] = detailsData.items.map((video: any) => ({
-      id: video.id,
-      title: video.snippet.title,
-      description: video.snippet.description,
-      thumbnail: video.snippet.thumbnails.high?.url || video.snippet.thumbnails.default?.url,
-      channelTitle: video.snippet.channelTitle,
-      publishedAt: video.snippet.publishedAt,
-      duration: video.contentDetails.duration,
-      viewCount: video.statistics.viewCount || '0',
-      likeCount: video.statistics.likeCount || '0',
-      url: `https://www.youtube.com/watch?v=${video.id}`,
-    }));
-    
+    // Since we don't have working API key, we'll return empty results
+    // In a real implementation, you would need a valid YouTube API key
     return {
-      videos,
-      total: data.pageInfo.totalResults,
-      nextPageToken: data.nextPageToken,
+      videos: [],
+      total: 0,
     };
   } catch (error) {
     console.error('Error searching YouTube videos:', error);
@@ -188,7 +151,8 @@ export const formatPublishedDate = (publishedAt: string): string => {
 
 // Validate YouTube URL
 export const isValidYouTubeUrl = (url: string): boolean => {
-  const regex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+  // More specific regex for YouTube URLs
+  const regex = /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)[\w-]+/;
   return regex.test(url);
 };
 
