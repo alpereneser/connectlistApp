@@ -20,7 +20,7 @@ import {
   Phone, 
   Clock, 
   Star, 
-  Share,
+  ShareNetwork,
   Heart,
   Plus,
   Camera
@@ -187,7 +187,7 @@ export default function PlaceDetailScreen() {
               style={styles.actionButton}
               onPress={handleShare}
             >
-              <Share size={20} color="#FFFFFF" />
+              <ShareNetwork size={20} color="#FFFFFF" />
             </TouchableOpacity>
             
             <TouchableOpacity 
