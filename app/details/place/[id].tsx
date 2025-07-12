@@ -20,10 +20,8 @@ import {
   Phone, 
   Clock, 
   Star, 
-  ShareNetwork,
   Heart,
-  Plus,
-  Camera
+  Plus
 } from 'phosphor-react-native';
 import AppBar from '../../../components/AppBar';
 import { getPlaceDetails, PlaceResult } from '../../../services/googleMapsApi';
@@ -161,7 +159,7 @@ export default function PlaceDetailScreen() {
     if (!place?.image) {
       return (
         <View style={styles.imagePlaceholder}>
-          <Camera size={48} color="#9CA3AF" />
+          <MapPin size={48} color="#9CA3AF" />
           <Text style={styles.imagePlaceholderText}>No images available</Text>
         </View>
       );
@@ -187,7 +185,7 @@ export default function PlaceDetailScreen() {
               style={styles.actionButton}
               onPress={handleShare}
             >
-              <ShareNetwork size={20} color="#FFFFFF" />
+              <Text style={styles.shareButtonText}>Share</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -493,6 +491,12 @@ const styles = StyleSheet.create({
   addToListText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter',
+  },
+  shareButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: 'Inter',
   },
