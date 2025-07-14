@@ -1,32 +1,45 @@
 // Test environment variables loading
-console.log('=== Environment Variables Test ===');
+require('dotenv').config();
 
-// Test direct process.env access
-console.log('Direct process.env access:');
-console.log('EXPO_PUBLIC_GOOGLE_MAPS_API_KEY:', process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ? 'LOADED' : 'NOT_LOADED');
-console.log('EXPO_PUBLIC_TMDB_API_KEY:', process.env.EXPO_PUBLIC_TMDB_API_KEY ? 'LOADED' : 'NOT_LOADED');
+console.log('=== Environment Variables Security Test ===');
 
-// Import and test our config
-try {
-  // For Node.js environment, we'll simulate the config
-  const DEVELOPMENT_CONFIG = {
-    SUPABASE_URL: 'https://ikalabbzbdbfuxpbiazz.supabase.co',
-    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrYWxhYmJ6YmRiZnV4cGJpYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDkxMTIsImV4cCI6MjA2NjI4NTExMn0.VptwNkqalA8hfBqasy943wx5kKezkd_Wx7UbN-80YA4',
-    TMDB_API_KEY: '378b6eb3c69f21d0815d31c4bf5f19a4',
-    TMDB_READ_ACCESS_TOKEN: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzNzhiNmViM2M2OWYyMWQwODE1ZDMxYzRiZjVmMTlhNCIsIm5iZiI6MTcxODY4NjkyNC41MjQ5OTk5LCJzdWIiOiI2NjcxMTRjY2Y4NDhiMmQ1NTM2YWE5YTMiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.4E-BfHAbJT4XgMJF9mG9OM4Rc3XdGzbd5n47acQ3tKw',
-    GOOGLE_MAPS_API_KEY: 'AIzaSyCEQZ1ri472vtTCiexDsriTKZTIPQoRJkY',
-    GOOGLE_BOOKS_API_KEY: 'AIzaSyDe4BIkhTKqHXggqlT88_04nDvfeePXc7w',
-    RAWG_API_KEY: 'd4b747af4c42469293a56cb985354e36',
-    YOUTUBE_API_KEY: 'AIzaSyDe4BIkhTKqHXggqlT88_04nDvfeePXc7w'
-  };
+// Required environment variables for production
+const REQUIRED_ENV_VARS = [
+  'EXPO_PUBLIC_SUPABASE_URL',
+  'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+  'EXPO_PUBLIC_GOOGLE_MAPS_API_KEY',
+  'EXPO_PUBLIC_TMDB_API_KEY',
+  'EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY',
+  'EXPO_PUBLIC_RAWG_API_KEY',
+  'EXPO_PUBLIC_YOUTUBE_API_KEY'
+];
 
-  console.log('\nFallback config test:');
-  Object.entries(DEVELOPMENT_CONFIG).forEach(([key, value]) => {
-    console.log(`${key}: ${value.substring(0, 15)}...`);
-  });
+console.log('Environment Variable Status:');
+REQUIRED_ENV_VARS.forEach(envVar => {
+  const value = process.env[envVar];
+  const status = value ? '✅ LOADED' : '❌ MISSING';
+  const preview = value ? `${value.substring(0, 10)}...` : 'NOT_SET';
+  console.log(`${status} ${envVar}: ${preview}`);
+});
 
-} catch (error) {
-  console.error('Error testing config:', error);
+// Check for security issues
+console.log('\n=== Security Check ===');
+const securityIssues = [];
+
+REQUIRED_ENV_VARS.forEach(envVar => {
+  const value = process.env[envVar];
+  if (!value) {
+    securityIssues.push(`Missing required environment variable: ${envVar}`);
+  } else if (value === 'your-api-key' || value === 'your_api_key') {
+    securityIssues.push(`Placeholder value found in ${envVar}`);
+  }
+});
+
+if (securityIssues.length === 0) {
+  console.log('✅ All environment variables are properly configured');
+} else {
+  console.log('❌ Security issues found:');
+  securityIssues.forEach(issue => console.log(`  - ${issue}`));
 }
 
 console.log('\n=== Test completed ===');

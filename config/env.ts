@@ -1,25 +1,25 @@
 // Environment configuration
 // This file provides a centralized way to manage environment variables
 
-// Production API keys (from .env file)
-const PRODUCTION_CONFIG = {
+// Development fallback configuration (for development only)
+const DEVELOPMENT_FALLBACK_CONFIG = {
   SUPABASE_URL: 'https://ikalabbzbdbfuxpbiazz.supabase.co',
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrYWxhYmJ6YmRiZnV4cGJpYXp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3MDkxMTIsImV4cCI6MjA2NjI4NTExMn0.VptwNkqalA8hfBqasy943wx5kKezkd_Wx7UbN-80YA4',
-  TMDB_API_KEY: '378b6eb3c69f21d0815d31c4bf5f19a4',
-  TMDB_READ_ACCESS_TOKEN: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzNzhiNmViM2M2OWYyMWQwODE1ZDMxYzRiZjVmMTlhNCIsIm5iZiI6MTcxODY4NjkyNC41MjQ5OTk5LCJzdWIiOiI2NjcxMTRjY2Y4NDhiMmQ1NTM2YWE5YTMiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.4E-BfHAbJT4XgMJF9mG9OM4Rc3XdGzbd5n47acQ3tKw',
-  GOOGLE_MAPS_API_KEY: 'AIzaSyCEQZ1ri472vtTCiexDsriTKZTIPQoRJkY',
-  GOOGLE_BOOKS_API_KEY: 'AIzaSyDe4BIkhTKqHXggqlT88_04nDvfeePXc7w',
-  RAWG_API_KEY: 'd4b747af4c42469293a56cb985354e36',
-  YOUTUBE_API_KEY: 'AIzaSyDe4BIkhTKqHXggqlT88_04nDvfeePXc7w'
+  TMDB_API_KEY: '',  // Use environment variable
+  TMDB_READ_ACCESS_TOKEN: '',  // Use environment variable
+  GOOGLE_MAPS_API_KEY: '',  // Use environment variable
+  GOOGLE_BOOKS_API_KEY: '',  // Use environment variable
+  RAWG_API_KEY: '',  // Use environment variable
+  YOUTUBE_API_KEY: ''  // Use environment variable
 };
 
 // Function to get environment variable with fallback
-function getEnvVar(key: keyof typeof PRODUCTION_CONFIG): string {
+function getEnvVar(key: keyof typeof DEVELOPMENT_FALLBACK_CONFIG): string {
   // Try to get from process.env first
   const envKey = `EXPO_PUBLIC_${key}`;
   const envValue = process.env[envKey];
   
-  // Debug log for each environment variable
+  // Debug log for each environment variable (only in development)
   if (__DEV__) {
     console.log(`🔍 Checking ${envKey}:`, {
       envValue: envValue ? `${envValue.substring(0, 15)}...` : 'undefined',
@@ -27,21 +27,26 @@ function getEnvVar(key: keyof typeof PRODUCTION_CONFIG): string {
     });
   }
   
-  if (envValue && envValue !== 'your-api-key' && envValue !== 'your-google-maps-api-key') {
-    if (__DEV__) {
-      console.log(`✅ Using environment variable for ${key}`);
+  // In production, require environment variables
+  if (!__DEV__) {
+    if (!envValue || envValue === 'your-api-key' || envValue === 'your-google-maps-api-key') {
+      console.error(`❌ Missing required environment variable: ${envKey}`);
+      throw new Error(`Missing required environment variable: ${envKey}`);
     }
     return envValue;
   }
   
-  // Fallback to production config (reliable keys)
-  const prodValue = PRODUCTION_CONFIG[key];
-  
-  if (__DEV__) {
-    console.log(`📝 Using production config for ${key}: ${prodValue ? `${prodValue.substring(0, 10)}...` : 'NOT_SET'}`);
+  // In development, use env var if available, otherwise fallback
+  if (envValue && envValue !== 'your-api-key' && envValue !== 'your-google-maps-api-key') {
+    console.log(`✅ Using environment variable for ${key}`);
+    return envValue;
   }
   
-  return prodValue || '';
+  // Fallback to development config (only in development)
+  const fallbackValue = DEVELOPMENT_FALLBACK_CONFIG[key];
+  console.log(`📝 Using development fallback for ${key}: ${fallbackValue ? `${fallbackValue.substring(0, 10)}...` : 'NOT_SET'}`);
+  
+  return fallbackValue || '';
 }
 
 // Export all environment variables

@@ -45,9 +45,16 @@ export function usePushNotifications() {
 
   const registerForPushNotifications = async () => {
     try {
-      // Skip push notifications on web or in Expo Go
+      // Skip push notifications on web or in Expo Go (SDK 53+)
       if (Platform.OS === 'web') {
         console.log('Push notifications are not supported on web');
+        return;
+      }
+
+      // Check if running in Expo Go
+      const isExpoGo = __DEV__ && !process.env.EAS_BUILD;
+      if (isExpoGo) {
+        console.log('Push notifications not supported in Expo Go (SDK 53+). Use development build.');
         return;
       }
 
@@ -64,7 +71,7 @@ export function usePushNotifications() {
         }
       }
     } catch (error) {
-      console.log('Push notification registration skipped:', error.message || error);
+      console.log('Push notification registration skipped:', error?.message || error);
     }
   };
 

@@ -33,15 +33,17 @@ export default function EmailVerificationScreen() {
     // Auth state değişikliklerini dinle
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email_confirmed_at);
+        
         if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
-          // Email doğrulandı, ana sayfaya yönlendir
+          console.log('Email verified! Redirecting to home...');
           router.replace('/');
         }
       }
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [router]);
 
   const handleResendEmail = async () => {
     if (!email) {

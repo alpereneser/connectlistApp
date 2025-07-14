@@ -168,13 +168,19 @@ export default function RegisterScreen() {
         return;
       }
 
+      // Get the current app URL for email redirect
+      const redirectUrl = Platform.OS === 'web' 
+        ? `${window.location.origin}/auth/callback`
+        : 'connectlist://auth/callback';
+      
+      console.log('Email redirect URL:', redirectUrl);
+
       // Register with Supabase
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
-          emailRedirectTo: undefined, // Email confirmation'ı devre dışı bırak
-          captchaToken: undefined, // Captcha'yı da devre dışı bırak
+          emailRedirectTo: redirectUrl,
           data: {
             full_name: fullName.trim(),
             username: username.trim().toLowerCase(),
@@ -188,8 +194,6 @@ export default function RegisterScreen() {
         
         if (error.message.includes('User already registered')) {
           Alert.alert('Email Already Registered', 'This email address is already registered. Please try logging in.');
-        } else if (error.message.includes('Email not confirmed')) {
-          Alert.alert('Registration Successful', 'Please check your email to verify your account.');
         } else {
           Alert.alert('Registration Error', `${error.message}\n\nCode: ${error.status || 'N/A'}`);
         }
@@ -200,28 +204,29 @@ export default function RegisterScreen() {
 
       if (data.user) {
         console.log('User created:', data.user.id);
+        console.log('User confirmation status:', data.user.email_confirmed_at);
+        console.log('Session status:', !!data.session);
         
-        // Session'ı ayarla (eğer varsa)
-        if (data.session) {
-          await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token
-          });
-        }
+        // Profile will be created automatically by database trigger after email confirmation
+        console.log('User registered successfully. Profile will be created by trigger after email confirmation.');
 
-        // Registration successful - profil oluşturma sorunu olsa bile devam et
+        // Always show email confirmation message for new registrations
         Alert.alert(
-          'Registration Successful!', 
-          'Welcome to ConnectList! Your account has been created successfully.',
+          'Check Your Email! 📧', 
+          `We've sent a confirmation link to ${email.trim().toLowerCase()}. Please check your email and click the link to complete your registration.`,
           [
             {
-              text: 'Get Started',
-              onPress: () => router.replace('/auth/login'), // Önce login sayfasına yönlendir
+              text: 'I\'ll check my email',
+              onPress: () => router.push({
+                pathname: '/auth/email-verification',
+                params: { email: email.trim().toLowerCase() }
+              }),
             },
           ]
         );
       } else {
         console.error('No user in response:', data);
+        console.log('Full registration response:', JSON.stringify(data, null, 2));
         Alert.alert('Registration Error', 'Account creation failed. Please try again.');
       }
     } catch (error) {

@@ -108,23 +108,47 @@ function HomeContent() {
           .in('id', userIds);
 
         // Fetch categories data separately  
+        const categoryIds = [...new Set(listsData.map(list => list.category_id).filter(Boolean))];
         const categoryNames = [...new Set(listsData.map(list => list.category).filter(Boolean))];
+        
+        console.log('Category IDs to fetch:', categoryIds); // Debug log
         console.log('Category names to fetch:', categoryNames); // Debug log
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('categories')
-          .select('name, display_name')
-          .in('name', categoryNames);
+        
+        let categoriesData = [];
+        let categoriesError = null;
+        
+        // Try fetching by category_id first
+        if (categoryIds.length > 0) {
+          const { data, error } = await supabase
+            .from('categories')
+            .select('id, name, display_name')
+            .in('id', categoryIds);
+          categoriesData = data || [];
+          categoriesError = error;
+        }
+        
+        // If no data from category_id, try by name
+        if (categoriesData.length === 0 && categoryNames.length > 0) {
+          const { data, error } = await supabase
+            .from('categories')
+            .select('id, name, display_name')
+            .in('name', categoryNames);
+          categoriesData = data || [];
+          categoriesError = error;
+        }
+        
         console.log('Categories data:', categoriesData, 'Categories error:', categoriesError); // Debug log
 
         // Create lookup maps
         const usersMap = usersData?.reduce((acc, user) => ({ ...acc, [user.id]: user }), {}) || {};
-        const categoriesMap = categoriesData?.reduce((acc, cat) => ({ ...acc, [cat.name]: cat }), {}) || {};
+        const categoriesMapById = categoriesData?.reduce((acc, cat) => ({ ...acc, [cat.id]: cat }), {}) || {};
+        const categoriesMapByName = categoriesData?.reduce((acc, cat) => ({ ...acc, [cat.name]: cat }), {}) || {};
 
         // Combine data
         const enrichedLists = listsData.map(list => ({
           ...list,
           users_profiles: usersMap[list.creator_id] || null,
-          categories: categoriesMap[list.category] || null
+          categories: categoriesMapById[list.category_id] || categoriesMapByName[list.category] || null
         }));
 
         setLists(enrichedLists);
